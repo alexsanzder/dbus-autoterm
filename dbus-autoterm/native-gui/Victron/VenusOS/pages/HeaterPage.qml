@@ -161,9 +161,9 @@ SwipeViewPage {
 			top: tabBar.bottom
 			topMargin: Theme.geometry_page_content_verticalMargin
 			left: parent.left
-			leftMargin: Theme.geometry_page_content_horizontalMargin / 2
+			leftMargin: Theme.geometry_page_content_horizontalMargin
 			right: parent.right
-			rightMargin: Theme.geometry_page_content_horizontalMargin / 2
+			rightMargin: Theme.geometry_page_content_horizontalMargin
 			bottom: parent.bottom
 			bottomMargin: Theme.geometry_page_content_verticalMargin
 		}
@@ -315,7 +315,7 @@ SwipeViewPage {
 					anchors {
 						right: parent.right
 						top: parent.top
-						rightMargin: 12
+						rightMargin: 0
 					}
 
 					CircularHeaterRing {
