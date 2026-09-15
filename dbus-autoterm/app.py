@@ -27,6 +27,7 @@ LOG = logging.getLogger(__name__)
 class RuntimeConfig:
     backend: str = "dummy"
     serial_device: str | None = None
+    provider_data: str = "simulated"  # "simulated" or "real" (for captured data)
     room_temperature_service: str = "auto"
     poll_interval: float = 1.0
     log_level: str = "INFO"
@@ -189,6 +190,7 @@ def _build_runtime_config(args: argparse.Namespace, arg_list: list[str], config:
         if args.serial_device is not None
         else _config_get(config, "driver", "serial_device", None)
     )
+    provider_data = _config_get(config, "driver", "provider_data", "simulated")
     room_temperature_service = (
         args.room_temperature_service
         if "--room-temperature-service" in arg_list and args.room_temperature_service is not None
@@ -222,6 +224,7 @@ def _build_runtime_config(args: argparse.Namespace, arg_list: list[str], config:
     return RuntimeConfig(
         backend=backend,
         serial_device=serial_device,
+        provider_data=provider_data,
         room_temperature_service=room_temperature_service,
         poll_interval=poll_interval,
         log_level=log_level,
@@ -289,7 +292,12 @@ def main(argv: list[str] | None = None) -> int:
     _configure_venus_dbus_runtime(runtime.mock_dbus)
 
     if runtime.backend == "dummy":
-        provider = DummyHeaterProvider()
+        if runtime.provider_data == "real":
+            LOG.info("Loading real heater data from captured frames...")
+            provider = DummyHeaterProvider(use_real_data=True)
+        else:
+            LOG.info("Using simulated dummy heater data")
+            provider = DummyHeaterProvider(use_real_data=False)
     else:
         if not runtime.serial_device:
             raise SystemExit("--serial-device is required for --backend=serial")

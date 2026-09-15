@@ -70,12 +70,60 @@ class SerialProviderConfig:
 
 class DummyHeaterProvider:
     # Dummy provider used for Cerbo-side UI and service validation before real heater transport is enabled.
-    def __init__(self) -> None:
+    def __init__(self, use_real_data: bool = False) -> None:
         self._snapshot = HeaterSnapshot()
         self._health = TransportHealth(connected=False, profile_name="dummy")
         self._phase_started_monotonic = time.monotonic()
         self._runtime_anchor_monotonic = time.monotonic()
-        self._set_phase(HeaterPhase.OFF)
+        self._use_real_data = use_real_data
+        self._real_data_frames = []
+        self._real_data_index = 0
+        
+        if use_real_data:
+            self._load_real_data()
+        else:
+            self._set_phase(HeaterPhase.OFF)
+    
+    def _load_real_data(self) -> None:
+        """Load real captured heater frames from JSON files."""
+        import json
+        from pathlib import Path
+        
+        try:
+            # Find latest captured frames file
+            captured_dir = Path("captured_data")
+            json_files = list(captured_dir.glob("frames_*.json"))
+            
+            if not json_files:
+                LOG.warning("No captured real data found in captured_data/. Falling back to simulated data.")
+                self._use_real_data = False
+                self._set_phase(HeaterPhase.OFF)
+                return
+            
+            latest_json = max(json_files)
+            with open(latest_json) as f:
+                data = json.load(f)
+            
+            # Extract status frames (0x0F)
+            self._real_data_frames = [
+                bytes.fromhex(f["payload"]) 
+                for f in data["frames"]["rx_frames"] 
+                if f["message_type"] == "0x0f"
+            ]
+            
+            if self._real_data_frames:
+                LOG.info(f"Loaded {len(self._real_data_frames)} real heater frames from {latest_json.name}")
+                self._health.connected = True
+                self._snapshot.connected = True
+                self._set_phase(HeaterPhase.RUNNING)
+            else:
+                LOG.warning("No 0x0F status frames found in captured data. Using simulated data.")
+                self._use_real_data = False
+                self._set_phase(HeaterPhase.OFF)
+        except Exception as e:
+            LOG.warning(f"Failed to load real data: {e}. Using simulated data instead.")
+            self._use_real_data = False
+            self._set_phase(HeaterPhase.OFF)
 
     def connect(self) -> None:
         self._health.connected = True
@@ -94,6 +142,57 @@ class DummyHeaterProvider:
         return self._health
 
     def refresh(self) -> HeaterSnapshot:
+        # If using real data, cycle through captured frames
+        if self._use_real_data and self._real_data_frames:
+            return self._refresh_from_real_data()
+        
+        # Otherwise use simulated data
+        return self._refresh_simulated()
+    
+    def _refresh_from_real_data(self) -> HeaterSnapshot:
+        """Refresh using real captured heater frames."""
+        if not self._real_data_frames:
+            return self._refresh_simulated()
+        
+        try:
+            # Get next frame and cycle through
+            payload = self._real_data_frames[self._real_data_index]
+            self._real_data_index = (self._real_data_index + 1) % len(self._real_data_frames)
+            
+            # Parse the 0x0F status frame
+            if len(payload) >= 19:
+                status_major = payload[0]
+                status_minor = payload[1]
+                internal_temp = int.from_bytes([payload[3]], signed=True)
+                external_temp = int.from_bytes([payload[4]], signed=True)
+                voltage = payload[6] / 10.0
+                heater_temp = payload[8] + 15
+                fan_rpm_set = payload[11]
+                fan_rpm_actual = payload[12]
+                fuel_pump_freq = payload[14] / 100.0 if len(payload) > 14 else 0.0
+                
+                # Update snapshot with real data
+                self._snapshot.telemetry.status_code_major = status_major
+                self._snapshot.telemetry.status_code_minor = status_minor
+                self._snapshot.telemetry.internal_temperature_c = internal_temp
+                self._snapshot.telemetry.external_temperature_c = external_temp if external_temp < 127 else None
+                self._snapshot.telemetry.battery_voltage_v = voltage
+                self._snapshot.telemetry.heater_temperature_c = heater_temp
+                self._snapshot.telemetry.fan_rpm_set = fan_rpm_set
+                self._snapshot.telemetry.fan_rpm_actual = fan_rpm_actual
+                self._snapshot.telemetry.fuel_pump_frequency_hz = fuel_pump_freq
+                self._snapshot.connected = True
+                self._health.connected = True
+        except Exception as e:
+            LOG.warning(f"Error parsing real data frame: {e}. Falling back to simulated.")
+            self._use_real_data = False
+            return self._refresh_simulated()
+        
+        self._snapshot.last_update_monotonic = time.monotonic()
+        return self._snapshot
+    
+    def _refresh_simulated(self) -> HeaterSnapshot:
+        """Refresh using simulated data (original logic)."""
         now = time.monotonic()
         phase_elapsed = now - self._phase_started_monotonic
 
