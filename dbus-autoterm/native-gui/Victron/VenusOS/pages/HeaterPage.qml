@@ -4,6 +4,7 @@
 */
 
 import QtQuick
+import QtQuick.Layouts
 import QtQuick.Controls.impl as CP
 import QtQuick.Templates as T
 import Victron.VenusOS
@@ -67,7 +68,7 @@ SwipeViewPage {
 		{ key: "power", modeValue: 0, label: "Power", icon: root.heaterIcon, description: "Run the heater at a fixed power level." },
 		{ key: "heat-ventilation", modeValue: 3, label: "Heat & Vent", icon: root.heaterIcon, description: "Blend heating with ventilation support." },
 		{ key: "thermostat", modeValue: -1, label: "Thermostat", icon: "qrc:/images/icon_temp_coolant_32.svg", description: "Thermostat control placeholder for the custom GUI." },
-		{ key: "ventilation", modeValue: 2, label: "Ventilation", icon: "qrc:/images/icon_propeller_32.png", description: "Circulate air without active heating." },
+		{ key: "ventilation", modeValue: 2, label: "Ventilation", icon: "qrc:/images/icon_propeller.svg", description: "Circulate air without active heating." },
 	]
 	readonly property string activeModeDescription: {
 		for (let i = 0; i < modeCards.length; ++i) {
@@ -189,12 +190,128 @@ SwipeViewPage {
 		visible: false
 	}
 
+	// Live telemetry strip (transparent, theme-friendly)
+	Item {
+		id: statusIndicatorHeader
+
+		anchors {
+			top: tabBar.bottom
+			left: parent.left
+			right: parent.right
+		}
+		visible: root.hasHeater
+		height: 64
+
+		readonly property var cells: [
+			{
+				icon: "qrc:/images/icon_checkmark_32.svg",
+				label: qsTr("Connection"),
+				value: (communicationAlarm.valid && communicationAlarm.value !== 0) ? qsTr("Alarm") : qsTr("Connected"),
+				valueColor: (communicationAlarm.valid && communicationAlarm.value !== 0) ? Theme.color_red : Theme.color_green,
+				iconColor: (communicationAlarm.valid && communicationAlarm.value !== 0) ? Theme.color_red : Theme.color_green
+			},
+			{
+				icon: "qrc:/images/icon_battery_24.svg",
+				label: qsTr("Battery"),
+				value: batteryVoltage.valid ? batteryVoltage.value.toFixed(1) + " V" : "--",
+				valueColor: Theme.color_font_primary,
+				iconColor: Theme.color_font_secondary
+			},
+			{
+				icon: "qrc:/images/icon_propeller.svg",
+				iconSize: 20,
+				label: qsTr("Fan"),
+				value: fanRpmActual.valid ? fanRpmActual.value + " " + qsTr("RPM") : "--",
+				valueColor: Theme.color_font_primary,
+				iconColor: Theme.color_font_secondary
+			},
+			{
+				icon: "qrc:/images/icon_engine_temp_32.svg",
+				label: qsTr("Heater"),
+				value: heaterTemperature.valid ? heaterTemperature.value + "\u00B0C" : "--",
+				valueColor: Theme.color_font_primary,
+				iconColor: Theme.color_font_secondary
+			},
+			{
+				icon: "qrc:/images/icon_temp_32.svg",
+				label: qsTr("Room"),
+				value: roomTemperature.valid
+						? root.formatTemperatureValue(roomTemperature)
+						: (internalTemperature.valid ? internalTemperature.value + "\u00B0C" : "--"),
+				valueColor: Theme.color_font_primary,
+				iconColor: Theme.color_font_secondary
+			}
+		]
+
+		RowLayout {
+			anchors {
+				fill: parent
+				leftMargin: Theme.geometry_page_content_horizontalMargin
+				rightMargin: Theme.geometry_page_content_horizontalMargin
+			}
+			spacing: 0
+
+			Repeater {
+				model: statusIndicatorHeader.cells
+
+				RowLayout {
+					id: statusCell
+
+					required property var modelData
+					required property int index
+
+					Layout.fillWidth: true
+					Layout.fillHeight: true
+					spacing: 10
+
+					Rectangle {
+						Layout.preferredWidth: 1
+						Layout.fillHeight: true
+						Layout.topMargin: 12
+						Layout.bottomMargin: 12
+						visible: statusCell.index > 0
+						color: Qt.rgba(1, 1, 1, 0.15)
+					}
+
+					CP.ColorImage {
+						Layout.alignment: Qt.AlignVCenter
+						Layout.preferredWidth: statusCell.modelData.iconSize !== undefined ? statusCell.modelData.iconSize : 22
+						Layout.preferredHeight: statusCell.modelData.iconSize !== undefined ? statusCell.modelData.iconSize : 22
+						source: statusCell.modelData.icon
+						color: statusCell.modelData.iconColor
+					}
+
+					ColumnLayout {
+						Layout.alignment: Qt.AlignVCenter
+						spacing: 0
+
+						Label {
+							Layout.fillWidth: true
+							font.pixelSize: Theme.font_size_caption
+							color: Theme.color_font_secondary
+							text: statusCell.modelData.label
+						}
+
+						Label {
+							Layout.fillWidth: true
+							font.pixelSize: Theme.font_size_body1
+							font.bold: true
+							elide: Label.ElideRight
+							color: statusCell.modelData.valueColor
+							text: statusCell.modelData.value
+						}
+					}
+				}
+			}
+		}
+	}
+
 	FocusScope {
 		id: contentScope
 
 		anchors {
-			top: tabBar.bottom
-			topMargin: Theme.geometry_page_content_verticalMargin
+			top: statusIndicatorHeader.bottom
+			topMargin: 16
 			left: parent.left
 			leftMargin: Theme.geometry_page_content_horizontalMargin
 			right: parent.right
@@ -404,6 +521,14 @@ SwipeViewPage {
 	VeQuickItem { id: roomTemperature; uid: root.bindPrefix + "/Temperatures/Room" }
 	VeQuickItem { id: targetTemperature; uid: root.bindPrefix + "/Settings/TargetTemperature" }
 	VeQuickItem { id: powerLevel; uid: root.bindPrefix + "/Settings/PowerLevel" }
+	// Live telemetry data
+	VeQuickItem { id: batteryVoltage; uid: root.bindPrefix + "/Dc/0/Voltage" }
+	VeQuickItem { id: fanRpmSet; uid: root.bindPrefix + "/Status/FanRpmSet" }
+	VeQuickItem { id: fanRpmActual; uid: root.bindPrefix + "/Status/FanRpmActual" }
+	VeQuickItem { id: heaterTemperature; uid: root.bindPrefix + "/Temperatures/Heater" }
+	VeQuickItem { id: internalTemperature; uid: root.bindPrefix + "/Temperatures/Internal" }
+	VeQuickItem { id: fuelPumpFrequency; uid: root.bindPrefix + "/Status/FuelPumpFrequency" }
+	VeQuickItem { id: communicationAlarm; uid: root.bindPrefix + "/Alarms/Communication" }
 
 	Connections {
 		target: heaterState
