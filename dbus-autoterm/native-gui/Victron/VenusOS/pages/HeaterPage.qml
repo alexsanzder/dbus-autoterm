@@ -77,6 +77,41 @@ SwipeViewPage {
 		}
 		return "Select a heater mode to see more details here."
 	}
+	// Live status line: replaces the static description while the heater
+	// transitions or runs, showing real telemetry for the active mode.
+	readonly property string statusDescription: {
+		if (!stateText.valid) {
+			return activeModeDescription
+		}
+		const room = root.formatTemperatureValue(roomTemperature)
+		if (stateText.value === "not connected") {
+			return "Heater not connected."
+		}
+		if (stateText.value === "fault") {
+			return errorText.valid && errorText.value !== "" ? errorText.value : "Heater fault."
+		}
+		if (stateText.value === "starting" || stateText.value === "starting ventilation") {
+			return "Starting heater..."
+		}
+		if (stateText.value === "warming up") {
+			return "Warming up..."
+		}
+		if (stateText.value === "shutting down" || stateText.value === "stopping ventilation") {
+			return "Cooling down before stopping..."
+		}
+		if (stateText.value === "running") {
+			const target = targetTemperature.valid ? root.formatTemperatureValue(targetTemperature) : "--"
+			if (showPowerControl) {
+				const level = powerLevel.valid ? powerLevel.value : "--"
+				return "Running at power level " + level + " \u00B7 room " + room
+			}
+			return "Heating to " + target + " \u00B7 room " + room
+		}
+		if (stateText.value === "ventilation") {
+			return "Ventilating \u00B7 room " + room
+		}
+		return activeModeDescription
+	}
 	readonly property var tabModel: {
 		const tabs = []
 		if (!heaterModel) {
@@ -275,7 +310,7 @@ SwipeViewPage {
 
 						Label {
 							width: parent.width
-							text: root.activeModeDescription
+							text: root.statusDescription
 							wrapMode: Text.WordWrap
 							color: Theme.color_font_secondary
 							font.pixelSize: Theme.font_size_caption
@@ -360,6 +395,8 @@ SwipeViewPage {
 		}
 	}
 
+	VeQuickItem { id: stateText; uid: root.bindPrefix + "/StateText" }
+	VeQuickItem { id: errorText; uid: root.bindPrefix + "/ErrorText" }
 	VeQuickItem { id: mode; uid: root.bindPrefix + "/Mode" }
 	VeQuickItem { id: heaterState; uid: root.bindPrefix + "/State" }
 	VeQuickItem { id: startStop; uid: root.bindPrefix + "/StartStop" }
