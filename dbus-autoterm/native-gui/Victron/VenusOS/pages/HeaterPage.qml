@@ -197,7 +197,7 @@ SwipeViewPage {
 				Flickable {
 					id: leftPanel
 
-					width: Math.max(parent.width - dialArea.width - 12, 0)
+					width: Math.max(parent.width - dialArea.width + 12, 0)
 					anchors {
 						top: parent.top
 						left: parent.left
