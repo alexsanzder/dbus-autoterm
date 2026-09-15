@@ -203,7 +203,7 @@ SwipeViewPage {
 						left: parent.left
 						bottom: parent.bottom
 						right: dialArea.left
-						rightMargin: 24
+						rightMargin: 12
 					}
 					contentWidth: width
 					contentHeight: leftContent.implicitHeight
@@ -265,7 +265,7 @@ SwipeViewPage {
 												maximumLineCount: 2
 												text: modelData.label
 												color: Theme.color_white
-												font.pixelSize: Theme.font_size_caption * 0.75
+												font.pixelSize: Theme.font_size_caption
 											}
 										}
 									}
