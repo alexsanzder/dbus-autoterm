@@ -18,7 +18,7 @@ Item {
 	readonly property real normalizedRatio: clamp(valueRatio, 0.0, 1.0)
 	readonly property real startAngle: 225
 	readonly property real endAngle: 495
-	readonly property real arcRadius: (Math.min(width, height) / 2) - (strokeWidth / 2) - 10
+	readonly property real arcRadius: (Math.min(width, height) / 2) - (strokeWidth / 2) - 2
 	readonly property real centerDiameter: (arcRadius * 2) - (strokeWidth * 1.9)
 
 	function clamp(value, minValue, maxValue) {
