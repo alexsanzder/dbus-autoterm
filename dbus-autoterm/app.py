@@ -13,8 +13,10 @@ from provider import DummyHeaterProvider, SerialHeaterProvider, SerialProviderCo
 from room_sensor import (
     AUTO_ROOM_TEMPERATURE_SERVICE,
     HEATER_INTAKE_TEMPERATURE_SERVICE,
+    HEATER_INTERNAL_TEMPERATURE_SERVICE,
     DbusRoomTemperatureReader,
     NullRoomTemperatureReader,
+    RoomTemperatureReading,
     RoomTemperatureServiceInfo,
 )
 
@@ -63,6 +65,15 @@ class HeaterDriverApp:
     def _publish_snapshot_with_room_context(self, snapshot) -> None:
         room_temperature = self.room_temperature_reader.refresh()
         selected_service = self.room_temperature_reader.selected_service or AUTO_ROOM_TEMPERATURE_SERVICE
+        
+        # Use heater's internal temperature if selected
+        if selected_service == HEATER_INTERNAL_TEMPERATURE_SERVICE:
+            room_temperature = RoomTemperatureReading(
+                temperature_c=float(snapshot.telemetry.internal_temperature_c),
+                source_text="Heater internal sensor",
+                service_name=HEATER_INTERNAL_TEMPERATURE_SERVICE,
+            )
+        
         self.dbus_adapter.publish_snapshot(
             snapshot,
             self.provider.get_health().connected,
@@ -70,6 +81,15 @@ class HeaterDriverApp:
             selected_service,
         )
         available_services = self.room_temperature_reader.available_services()
+        # Add heater's internal temperature sensor as an available option
+        available_services = [
+            RoomTemperatureServiceInfo(
+                service_name=HEATER_INTERNAL_TEMPERATURE_SERVICE,
+                display_name="Heater internal sensor",
+                temperature_c=float(snapshot.telemetry.internal_temperature_c),
+            ),
+            *available_services,
+        ]
         if snapshot.telemetry.external_temperature_c is not None:
             available_services = [
                 RoomTemperatureServiceInfo(

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 AUTO_ROOM_TEMPERATURE_SERVICE = "auto"
 HEATER_INTAKE_TEMPERATURE_SERVICE = "heater_external"
+HEATER_INTERNAL_TEMPERATURE_SERVICE = "heater_internal"
 
 
 @dataclass(frozen=True)
@@ -47,6 +48,12 @@ class DbusRoomTemperatureReader:
         self._selected_service = service_name or AUTO_ROOM_TEMPERATURE_SERVICE
 
     def refresh(self) -> RoomTemperatureReading:
+        if self._selected_service == HEATER_INTERNAL_TEMPERATURE_SERVICE:
+            return RoomTemperatureReading(
+                temperature_c=None,
+                source_text="Heater internal sensor",
+                service_name=HEATER_INTERNAL_TEMPERATURE_SERVICE,
+            )
         if self._selected_service == HEATER_INTAKE_TEMPERATURE_SERVICE:
             return RoomTemperatureReading(
                 temperature_c=None,
