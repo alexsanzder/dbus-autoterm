@@ -1,0 +1,129 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                    NATIVE GUI - HEATER PAGE LAYOUT                         ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+BEFORE (Original)
+─────────────────
+┌────────────────────────────────────────────────────────────────────────────┐
+│ ☰ Heater [Heater 1 ▼]                           [Status Bar: Idle/Expanding]│
+├────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  LEFT PANEL                        │     DIAL AREA                          │
+│  ─────────────────────────────────┼─────────────────────────────────────   │
+│                                   │                                         │
+│  [Temperature] [Power] [Heat]     │      ┌─────────────┐                   │
+│  [Ventilation] [Heat+Vent]        │      │ Heater Page │                   │
+│                                   │      │   Display   │                   │
+│  Status: Heater cooling down      │      │  (Circular  │                   │
+│                                   │      │   Ring)     │                   │
+│  [  START HEATER  ]               │      │             │                   │
+│                                   │      │  Room: 18°C │                   │
+│                                   │      │  Power: 5   │                   │
+│                                   │      │             │                   │
+│                                   │      │   [ – ] [ + ]│                   │
+│                                   │      └─────────────┘                   │
+│                                   │                                         │
+│  Live values                       │                                         │
+│  🌡️ 18°C | 🔥 145°C             │                                         │
+│                                   │                                         │
+│  [> Live data] [> Diagnostics]    │                                         │
+│                                   │                                         │
+└────────────────────────────────────────────────────────────────────────────┘
+
+
+AFTER (Enhanced with Status Header)
+─────────────────────────────────────
+┌────────────────────────────────────────────────────────────────────────────┐
+│ ☰ Heater [Heater 1 ▼]                           [Status Bar: Idle/Expanding]│
+├────────────────────────────────────────────────────────────────────────────┤
+│  🟢 Connected │ 🔋 Battery 13.2 V │ 💨 Fan 70 RPM │ 🔥 Heater 145°C │ 🌡️ 28°C  │ ← NEW HEADER
+├────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  LEFT PANEL                        │     DIAL AREA                          │
+│  ─────────────────────────────────┼─────────────────────────────────────   │
+│                                   │                                         │
+│  [Temperature] [Power] [Heat]     │      ┌─────────────┐                   │
+│  [Ventilation] [Heat+Vent]        │      │ Heater Page │                   │
+│                                   │      │   Display   │                   │
+│  Status: Running at power level 5 │      │  (Circular  │                   │
+│          room 18°C                │      │   Ring)     │                   │
+│                                   │      │             │                   │
+│  [  STOP HEATER  ]                │      │  Room: 18°C │                   │
+│                                   │      │  Power: 5   │                   │
+│                                   │      │             │                   │
+│                                   │      │   [ – ] [ + ]│                   │
+│                                   │      └─────────────┘                   │
+│                                   │                                         │
+│  [> Live data] [> Diagnostics]    │                                         │
+│                                   │                                         │
+└────────────────────────────────────────────────────────────────────────────┘
+
+
+STATUS HEADER DETAILS
+─────────────────────
+┌─ CONNECTION ─┬─ BATTERY ─────────────┬─ FAN ──────────┬─ HEATER ──────────┬─ INTERNAL ───┐
+│              │                       │                │                   │              │
+│ 🟢 Connected │ 🔋          Battery   │ 💨      Fan    │ 🔥      Heater    │ 🌡️  Internal  │
+│              │    13.2 V             │    70 RPM      │    145°C          │     28°C     │
+│              │                       │                │                   │              │
+└──────────────┴───────────────────────┴────────────────┴───────────────────┴──────────────┘
+     40px              90px                  80px              100px             100px
+
+Height: 56px
+Background: Light gray (Theme.color_gray5)
+Border: 1px separator (Theme.color_gray3)
+
+
+DATA FLOW
+─────────
+D-Bus Service (com.victronenergy.heater.autoterm_air2d)
+     │
+     ├── /Dc/0/Voltage ──────────────────→ 🔋 Battery Voltage
+     ├── /Status/FanRpmActual ──────────→ 💨 Fan RPM
+     ├── /Temperatures/Heater ──────────→ 🔥 Heater Temperature
+     ├── /Temperatures/Internal ───────→ 🌡️ Internal Temperature
+     └── /Alarms/Communication ────────→ 🟢 Connection Status
+
+
+RESPONSIVE BEHAVIOR
+───────────────────
+┌─────────────────────────────────────────┐
+│   Wide Screen (1024px+)                 │
+│   Shows all 5 indicators side by side   │
+├─────────────────────────────────────────┤
+│   Medium Screen (768px-1024px)          │
+│   May wrap to 2-3 rows                  │
+├─────────────────────────────────────────┤
+│   Narrow Screen (<768px)                │
+│   Indicators stack vertically           │
+└─────────────────────────────────────────┘
+
+
+VISUAL STATES
+─────────────
+
+State: Off/Standby
+┌─ CONNECTION ─┬─ BATTERY ─────────────┬─ FAN ──────────┬─ HEATER ──────────┬─ INTERNAL ───┐
+│ 🟢 Connected │ 🔋        13.2 V      │ 💨       0 RPM │ 🔥        25°C    │ 🌡️     22°C  │
+└──────────────┴───────────────────────┴────────────────┴───────────────────┴──────────────┘
+
+State: Starting (Warm-up Phase)
+┌─ CONNECTION ─┬─ BATTERY ─────────────┬─ FAN ──────────┬─ HEATER ──────────┬─ INTERNAL ───┐
+│ 🟢 Connected │ 🔋        13.2 V      │ 💨      25 RPM │ 🔥        85°C    │ 🌡️     22°C  │
+└──────────────┴───────────────────────┴────────────────┴───────────────────┴──────────────┘
+
+State: Running (Active Heating)
+┌─ CONNECTION ─┬─ BATTERY ─────────────┬─ FAN ──────────┬─ HEATER ──────────┬─ INTERNAL ───┐
+│ 🟢 Connected │ 🔋        13.1 V      │ 💨      70 RPM │ 🔥       145°C    │ 🌡️     28°C  │
+└──────────────┴───────────────────────┴────────────────┴───────────────────┴──────────────┘
+
+State: Cooling Down (Post-run)
+┌─ CONNECTION ─┬─ BATTERY ─────────────┬─ FAN ──────────┬─ HEATER ──────────┬─ INTERNAL ───┐
+│ 🟢 Connected │ 🔋        13.2 V      │ 💨      45 RPM │ 🔥        95°C    │ 🌡️     26°C  │
+└──────────────┴───────────────────────┴────────────────┴───────────────────┴──────────────┘
+
+State: Communication Error
+┌─ CONNECTION ─┬─ BATTERY ─────────────┬─ FAN ──────────┬─ HEATER ──────────┬─ INTERNAL ───┐
+│ 🔴    Alarm  │ 🔋        -- V        │ 💨        -- RPM│ 🔥         -- °C  │ 🌡️      -- °C │
+└──────────────┴───────────────────────┴────────────────┴───────────────────┴──────────────┘
+
