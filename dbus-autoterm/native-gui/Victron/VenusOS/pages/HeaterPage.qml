@@ -265,7 +265,7 @@ SwipeViewPage {
 												maximumLineCount: 2
 												text: modelData.label
 												color: Theme.color_white
-												font.pixelSize: Theme.font_size_caption
+												font.pixelSize: Theme.font_size_caption - 2
 											}
 										}
 									}
@@ -310,7 +310,7 @@ SwipeViewPage {
 
 				Item {
 					id: dialArea
-					width: Math.min(parent.width / 3, 200)
+					width: Math.min(parent.width / 3, 240)
 					height: width + 108
 					anchors {
 						right: parent.right
