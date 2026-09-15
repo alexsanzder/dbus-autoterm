@@ -265,7 +265,7 @@ SwipeViewPage {
 												maximumLineCount: 2
 												text: modelData.label
 												color: Theme.color_white
-												font.pixelSize: Theme.font_size_caption - 2
+												font.pixelSize: Theme.font_size_caption
 											}
 										}
 									}
