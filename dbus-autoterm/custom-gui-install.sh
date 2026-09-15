@@ -25,7 +25,9 @@ done < <(find "$SOURCE_ROOT" -type f \( -name '*.qml' -o -name '*.svg' -o -name 
 if [ "$files_changed" -eq 1 ]; then
     echo "Installed custom Autoterm GUI files."
 
-    if [ -d "/service/gui" ]; then
+    if [ -d "/service/gui-v2" ]; then
+        service_path="/service/gui-v2"
+    elif [ -d "/service/gui" ]; then
         service_path="/service/gui"
     else
         service_path="/service/start-gui"

@@ -47,7 +47,9 @@ remove_file() {
 restart_gui() {
     local service_path
 
-    if [ -d "/service/gui" ]; then
+    if [ -d "/service/gui-v2" ]; then
+        service_path="/service/gui-v2"
+    elif [ -d "/service/gui" ]; then
         service_path="/service/gui"
     else
         service_path="/service/start-gui"
