@@ -217,8 +217,9 @@ SwipeViewPage {
 						spacing: 18
 
 						Row {
-							width: parent.width
+							width: parent.width - 12
 							spacing: 12
+							anchors.horizontalCenter: parent.horizontalCenter
 
 							Repeater {
 								model: root.modeCards
@@ -230,7 +231,7 @@ SwipeViewPage {
 									readonly property bool roomSensorMode: modelData.modeValue === 1 || modelData.modeValue === 3
 									readonly property bool supported: modelData.modeValue >= 0
 									readonly property bool selectable: supported && (!roomSensorMode || root.hasRoomTemperatureControl)
-									width: (leftContent.width - (4 * parent.spacing)) / 5
+									width: (parent.width - (4 * parent.spacing)) / 5
 									height: 92
 
 									Button {
@@ -279,6 +280,31 @@ SwipeViewPage {
 							color: Theme.color_font_secondary
 							font.pixelSize: Theme.font_size_caption
 						}
+
+						Button {
+							id: actionButton
+							width: parent.width
+							height: 56
+							text: root.actionLabel
+							enabled: startStop.valid && !root.isTransitioning
+							flat: false
+							backgroundColor: root.pendingStartStopAction === "start"
+								? Theme.color_darkBlue
+								: (root.pendingStartStopAction === "stop"
+									? Theme.color_darkRed
+									: (root.isRunning ? Theme.color_red : Theme.color_blue))
+							borderColor: root.pendingStartStopAction === "start"
+								? Theme.color_darkBlue
+								: (root.pendingStartStopAction === "stop"
+									? Theme.color_darkRed
+									: (root.isRunning ? Theme.color_red : Theme.color_blue))
+							color: Theme.color_white
+							font.pixelSize: Theme.font_size_body1
+							font.bold: true
+							onClicked: Global.dialogLayer.open(startStopDialogComponent, {
+								startRequested: !root.isRunning,
+							})
+						}
 					}
 				}
 
@@ -289,12 +315,13 @@ SwipeViewPage {
 					anchors {
 						right: parent.right
 						top: parent.top
+						rightMargin: 12
 					}
 
 					CircularHeaterRing {
 						id: ring
-						width: parent.width
-						height: parent.width
+						width: parent.width - 12
+						height: parent.width - 12
 						anchors.top: parent.top
 						anchors.horizontalCenter: parent.horizontalCenter
 						valueRatio: root.ringValueRatio
@@ -326,33 +353,6 @@ SwipeViewPage {
 							font.pixelSize: Theme.font_size_h2
 							onClicked: root.adjustRingValue(1)
 						}
-					}
-
-					Button {
-						anchors.top: parent.top
-						anchors.topMargin: ring.height + 56
-						anchors.horizontalCenter: ring.horizontalCenter
-						width: parent.width
-						height: 52
-						text: root.actionLabel
-						enabled: startStop.valid && !root.isTransitioning
-						flat: false
-						backgroundColor: root.pendingStartStopAction === "start"
-							? Theme.color_darkBlue
-							: (root.pendingStartStopAction === "stop"
-								? Theme.color_darkRed
-								: (root.isRunning ? Theme.color_red : Theme.color_blue))
-						borderColor: root.pendingStartStopAction === "start"
-							? Theme.color_darkBlue
-							: (root.pendingStartStopAction === "stop"
-								? Theme.color_darkRed
-								: (root.isRunning ? Theme.color_red : Theme.color_blue))
-						color: Theme.color_white
-						font.pixelSize: Theme.font_size_body1
-						font.bold: true
-						onClicked: Global.dialogLayer.open(startStopDialogComponent, {
-							startRequested: !root.isRunning,
-						})
 					}
 				}
 			}
