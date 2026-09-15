@@ -161,9 +161,9 @@ SwipeViewPage {
 			top: tabBar.bottom
 			topMargin: Theme.geometry_page_content_verticalMargin
 			left: parent.left
-			leftMargin: Theme.geometry_page_content_horizontalMargin
+			leftMargin: Theme.geometry_page_content_horizontalMargin / 2
 			right: parent.right
-			rightMargin: Theme.geometry_page_content_horizontalMargin
+			rightMargin: Theme.geometry_page_content_horizontalMargin / 2
 			bottom: parent.bottom
 			bottomMargin: Theme.geometry_page_content_verticalMargin
 		}
