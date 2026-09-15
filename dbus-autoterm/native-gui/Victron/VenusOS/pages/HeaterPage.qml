@@ -195,7 +195,7 @@ SwipeViewPage {
 		id: statusIndicatorHeader
 
 		anchors {
-			top: tabBar.bottom
+			top: tabBar.visible ? tabBar.bottom : parent.top
 			left: parent.left
 			right: parent.right
 		}
@@ -466,6 +466,9 @@ SwipeViewPage {
 					height: width + 108
 					anchors {
 						right: parent.right
+						// pin to the top, aligned with the mode tabs: the page bottom edge moves
+						// when the nav bar shows/hides (bottom: navBar.top in MainView), so any
+						// verticalCenter anchoring here would shift the dial on every bar toggle
 						top: parent.top
 						rightMargin: 0
 					}

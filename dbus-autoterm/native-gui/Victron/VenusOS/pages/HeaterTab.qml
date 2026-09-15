@@ -7,9 +7,7 @@ BaseListView {
 
 	property bool animationEnabled: true
 
-	bottomMargin: Global.pageManager?.expandLayout
-			? Theme.geometry_levelsPage_gaugesView_expanded_bottomMargin
-			: Theme.geometry_levelsPage_gaugesView_compact_bottomMargin
+	bottomMargin: 0
 	leftMargin: contentWidth > width
 			? Theme.geometry_levelsPage_gaugesView_horizontalMargin
 			: parent.width/2 - contentWidth / 2
