@@ -320,10 +320,11 @@ SwipeViewPage {
 
 					CircularHeaterRing {
 						id: ring
-						width: parent.width - 12
-						height: parent.width - 12
+						width: parent.width
+						height: parent.width
 						anchors.top: parent.top
 						anchors.horizontalCenter: parent.horizontalCenter
+
 						valueRatio: root.ringValueRatio
 						progressColor: Theme.color_blue
 						primaryValue: root.formatTemperatureValue(roomTemperature)
