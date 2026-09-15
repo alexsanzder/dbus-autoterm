@@ -310,7 +310,7 @@ SwipeViewPage {
 
 				Item {
 					id: dialArea
-					width: Math.min(parent.width / 3, 272)
+					width: Math.min(parent.width / 3, 240)
 					height: width + 108
 					anchors {
 						right: parent.right
