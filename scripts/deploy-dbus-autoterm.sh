@@ -12,6 +12,10 @@ ARCHIVE="$ROOT_DIR/dist/dbus-autoterm.tar.gz"
 CERBO_HOST="${CERBO_HOST:-root@einstein}"
 CERBO_APP_DIR="${CERBO_APP_DIR:-/data/apps/dbus-autoterm}"
 CERBO_ARCHIVE_PATH="${CERBO_ARCHIVE_PATH:-/data/dbus-autoterm.tar.gz}"
+REMOTE_DEPLOY_SCRIPT="${REMOTE_DEPLOY_SCRIPT:-/data/dbus-autoterm-deploy.sh}"
+REMOTE_DEPLOY_LOG="${REMOTE_DEPLOY_LOG:-/data/dbus-autoterm-deploy.log}"
+REMOTE_DEPLOY_STATUS="${REMOTE_DEPLOY_STATUS:-/data/dbus-autoterm-deploy.status}"
+DEPLOY_TIMEOUT_SECONDS="${DEPLOY_TIMEOUT_SECONDS:-240}"
 CERBO_PASSWORD="${CERBO_PASSWORD:-${SSH_PASSWORD:-}}"
 TMP_DIR=$(mktemp -d)
 CONTROL_PATH="$TMP_DIR/ssh-control"
@@ -72,14 +76,37 @@ fi
 echo "Uploading $ARCHIVE to $CERBO_HOST:$CERBO_ARCHIVE_PATH"
 $SCP_BIN $SSH_OPTS "$ARCHIVE" "$CERBO_HOST:$CERBO_ARCHIVE_PATH"
 
-echo "Deploying package on $CERBO_HOST"
-$SSH_BIN $SSH_OPTS "$CERBO_HOST" \
-    "ARCHIVE_PATH='$CERBO_ARCHIVE_PATH' CERBO_APP_DIR='$CERBO_APP_DIR' GUI_VARIANT='$GUI_VARIANT' /bin/sh -s" <<'REMOTE_SCRIPT'
+# Install the deploy worker on the device. It is launched detached so that a dropped SSH
+# connection during the GUI restart cannot interrupt the install. We prefer `setsid` but
+# fall back to `nohup` for minimal BusyBox environments (e.g. some Venus OS builds). Progress
+# is written to a log and a terminal status file that we poll from here.
+echo "Uploading deploy worker to $CERBO_HOST:$REMOTE_DEPLOY_SCRIPT"
+$SSH_BIN $SSH_OPTS "$CERBO_HOST" "cat > '$REMOTE_DEPLOY_SCRIPT'" <<'REMOTE_SCRIPT'
+#!/bin/sh
 set -eu
 
-archive_path="${ARCHIVE_PATH}"
-app_dir="${CERBO_APP_DIR}"
-gui_variant="${GUI_VARIANT}"
+archive_path=$1
+app_dir=$2
+gui_variant=$3
+log_file=$4
+status_file=$5
+
+exec >"$log_file" 2>&1
+
+cleanup() {
+    rc=$?
+    if [ "$rc" -eq 0 ]; then
+        echo "DEPLOY_DONE"
+        echo DONE > "$status_file"
+    else
+        echo "DEPLOY_FAILED rc=$rc"
+        echo "FAILED rc=$rc" > "$status_file"
+    fi
+}
+trap cleanup EXIT
+
+echo "=== dbus-autoterm deploy started $(date) ==="
+
 parent_dir=$(dirname "$app_dir")
 deploy_root=/tmp/dbus-autoterm-deploy
 extracted_dir="$deploy_root/dbus-autoterm"
@@ -118,4 +145,30 @@ rm -f "$archive_path"
 rm -rf "$deploy_root"
 REMOTE_SCRIPT
 
-echo "Deployment finished."
+echo "Launching detached deployment on $CERBO_HOST"
+$SSH_BIN $SSH_OPTS "$CERBO_HOST" \
+    "rm -f '$REMOTE_DEPLOY_STATUS'; if command -v setsid >/dev/null 2>&1; then setsid /bin/sh '$REMOTE_DEPLOY_SCRIPT' '$CERBO_ARCHIVE_PATH' '$CERBO_APP_DIR' '$GUI_VARIANT' '$REMOTE_DEPLOY_LOG' '$REMOTE_DEPLOY_STATUS' </dev/null >/dev/null 2>&1 & else nohup /bin/sh '$REMOTE_DEPLOY_SCRIPT' '$CERBO_ARCHIVE_PATH' '$CERBO_APP_DIR' '$GUI_VARIANT' '$REMOTE_DEPLOY_LOG' '$REMOTE_DEPLOY_STATUS' </dev/null >/dev/null 2>&1 & fi; echo LAUNCHED"
+
+echo "Waiting for deployment to finish (detached; survives SSH drops)"
+elapsed=0
+while [ "$elapsed" -lt "$DEPLOY_TIMEOUT_SECONDS" ]; do
+    status=$($SSH_BIN $SSH_OPTS "$CERBO_HOST" "cat '$REMOTE_DEPLOY_STATUS' 2>/dev/null" 2>/dev/null || true)
+    case "$status" in
+        DONE)
+            echo "Deployment finished."
+            $SSH_BIN $SSH_OPTS "$CERBO_HOST" "tail -n 20 '$REMOTE_DEPLOY_LOG' 2>/dev/null" 2>/dev/null || true
+            exit 0
+            ;;
+        FAILED*)
+            echo "Deployment FAILED: $status" >&2
+            $SSH_BIN $SSH_OPTS "$CERBO_HOST" "tail -n 40 '$REMOTE_DEPLOY_LOG' 2>/dev/null" >&2 2>/dev/null || true
+            exit 1
+            ;;
+    esac
+    sleep 3
+    elapsed=$((elapsed + 3))
+done
+
+echo "Timed out after ${DEPLOY_TIMEOUT_SECONDS}s waiting for deployment." >&2
+echo "The job may still be running on-device. Check: $CERBO_HOST:$REMOTE_DEPLOY_LOG" >&2
+exit 1
