@@ -83,6 +83,15 @@ SwipeViewPage {
 		}
 		return "Select a heater mode to see more details here."
 	}
+	// Short status for the dial top: the active mode label only.
+	readonly property string activeModeLabel: {
+		for (let i = 0; i < modeCards.length; ++i) {
+			if (modeCards[i].key === activeModeCardKey) {
+				return modeCards[i].label
+			}
+		}
+		return ""
+	}
 	// Live status line: replaces the static description while the heater
 	// transitions or runs, showing real telemetry for the active mode.
 	readonly property string statusDescription: {
@@ -400,32 +409,58 @@ SwipeViewPage {
 								primaryValue: root.ringPrimaryValue
 								secondaryValue: ""
 								captionValue: root.ringCurrentTempCaption
-								statusValue: root.statusDescription
+								statusValue: root.activeModeLabel
 							}
 
 							// Steppers hug the ring's bottom opening, like the previous design
 							Row {
 								anchors.top: ring.bottom
-								anchors.topMargin: -48
+								anchors.topMargin: -56
 								anchors.horizontalCenter: ring.horizontalCenter
 								spacing: 12
 
-								Button {
+								Item {
 									width: 56
 									height: 56
-									text: "\u2013"
-									enabled: root.canAdjustRingValue
-									font.pixelSize: Theme.font_size_h2
-									onClicked: root.adjustRingValue(-1)
+
+									Button {
+										anchors.fill: parent
+										text: "\u2013"
+										enabled: root.canAdjustRingValue
+										font.pixelSize: Theme.font_size_h2
+										onClicked: root.adjustRingValue(-1)
+									}
+
+									// White rounded 2px border overlay
+									Rectangle {
+										anchors.fill: parent
+										radius: 8
+										color: "transparent"
+										border.width: 2
+										border.color: Theme.color_white
+									}
 								}
 
-								Button {
+								Item {
 									width: 56
 									height: 56
-									text: "+"
-									enabled: root.canAdjustRingValue
-									font.pixelSize: Theme.font_size_h2
-									onClicked: root.adjustRingValue(1)
+
+									Button {
+										anchors.fill: parent
+										text: "+"
+										enabled: root.canAdjustRingValue
+										font.pixelSize: Theme.font_size_h2
+										onClicked: root.adjustRingValue(1)
+									}
+
+									// White rounded 2px border overlay
+									Rectangle {
+										anchors.fill: parent
+										radius: 8
+										color: "transparent"
+										border.width: 2
+										border.color: Theme.color_white
+									}
 								}
 							}
 
