@@ -565,7 +565,7 @@ SwipeViewPage {
 								},
 								{
 									icon: root.pumpIcon,
-									label: qsTr("Fuel Pump Freq"),
+									label: qsTr("Fuel pump freq."),
 									value: root.heaterDisconnected ? "--" : (fuelPumpFrequency.valid ? fuelPumpFrequency.value.toFixed(1) + " " + qsTr("Hz") : "--"),
 									valueColor: root.heaterDisconnected ? Qt.alpha(Theme.color_font_primary, 0.5) : Theme.color_font_primary,
 									iconColor: root.heaterDisconnected ? Qt.alpha(Theme.color_font_secondary, 0.5) : Theme.color_font_secondary
