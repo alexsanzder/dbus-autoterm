@@ -249,128 +249,13 @@ SwipeViewPage {
 		visible: false
 	}
 
-	// Live telemetry strip (transparent, theme-friendly)
-	Item {
-		id: statusIndicatorHeader
 
-		anchors {
-			top: tabBar.visible ? tabBar.bottom : parent.top
-			left: parent.left
-			right: parent.right
-		}
-		// Telemetry strip spans the top of the fixed two-column card.
-		visible: root.hasHeater
-		height: visible ? 64 : 0
-
-		readonly property var cells: [
-			{
-				icon: "qrc:/images/icon_checkmark_32.svg",
-				label: qsTr("Connection"),
-				value: (communicationAlarm.valid && communicationAlarm.value !== 0) ? qsTr("Alarm") : qsTr("Connected"),
-				valueColor: (communicationAlarm.valid && communicationAlarm.value !== 0) ? Theme.color_red : Theme.color_green,
-				iconColor: (communicationAlarm.valid && communicationAlarm.value !== 0) ? Theme.color_red : Theme.color_green
-			},
-			{
-				icon: "qrc:/images/icon_battery_24.svg",
-				label: qsTr("Battery"),
-				value: batteryVoltage.valid ? batteryVoltage.value.toFixed(1) + " V" : "--",
-				valueColor: Theme.color_font_primary,
-				iconColor: Theme.color_font_secondary
-			},
-			{
-				icon: "qrc:/images/icon_propeller.svg",
-				iconSize: 20,
-				label: qsTr("Fan"),
-				value: fanRpmActual.valid ? fanRpmActual.value + " " + qsTr("RPM") : "--",
-				valueColor: Theme.color_font_primary,
-				iconColor: Theme.color_font_secondary
-			},
-			{
-				icon: "qrc:/images/icon_engine_temp_32.svg",
-				label: qsTr("Heater"),
-				value: heaterTemperature.valid ? heaterTemperature.value + "\u00B0C" : "--",
-				valueColor: Theme.color_font_primary,
-				iconColor: Theme.color_font_secondary
-			},
-			{
-				icon: "qrc:/images/icon_temp_32.svg",
-				label: qsTr("Room"),
-				value: roomTemperature.valid
-						? root.formatTemperatureValue(roomTemperature)
-						: (internalTemperature.valid ? internalTemperature.value + "\u00B0C" : "--"),
-				valueColor: Theme.color_font_primary,
-				iconColor: Theme.color_font_secondary
-			}
-		]
-
-		RowLayout {
-			anchors {
-				fill: parent
-				leftMargin: Theme.geometry_page_content_horizontalMargin
-				rightMargin: Theme.geometry_page_content_horizontalMargin
-			}
-			spacing: 0
-
-			Repeater {
-				model: statusIndicatorHeader.cells
-
-				RowLayout {
-					id: statusCell
-
-					required property var modelData
-					required property int index
-
-					Layout.fillWidth: true
-					Layout.fillHeight: true
-					spacing: 10
-
-					Rectangle {
-						Layout.preferredWidth: 1
-						Layout.fillHeight: true
-						Layout.topMargin: 12
-						Layout.bottomMargin: 12
-						visible: statusCell.index > 0
-						color: Qt.rgba(1, 1, 1, 0.15)
-					}
-
-					CP.ColorImage {
-						Layout.alignment: Qt.AlignVCenter
-						Layout.preferredWidth: statusCell.modelData.iconSize !== undefined ? statusCell.modelData.iconSize : 22
-						Layout.preferredHeight: statusCell.modelData.iconSize !== undefined ? statusCell.modelData.iconSize : 22
-						source: statusCell.modelData.icon
-						color: statusCell.modelData.iconColor
-					}
-
-					ColumnLayout {
-						Layout.alignment: Qt.AlignVCenter
-						spacing: 0
-
-						Label {
-							Layout.fillWidth: true
-							font.pixelSize: Theme.font_size_caption
-							color: Theme.color_font_secondary
-							text: statusCell.modelData.label
-						}
-
-						Label {
-							Layout.fillWidth: true
-							font.pixelSize: Theme.font_size_body1
-							font.bold: true
-							elide: Label.ElideRight
-							color: statusCell.modelData.valueColor
-							text: statusCell.modelData.value
-						}
-					}
-				}
-			}
-		}
-	}
 
 	FocusScope {
 		id: contentScope
 
 		anchors {
-			top: statusIndicatorHeader.bottom
+			top: tabBar.visible ? tabBar.bottom : parent.top
 			topMargin: 12
 			left: parent.left
 			leftMargin: Theme.geometry_page_content_horizontalMargin
@@ -407,7 +292,7 @@ SwipeViewPage {
 				height: heaterTab.height
 
 				// Fixed two-column card for 7" displays: dial + start/stop on the left,
-				// status details + mode selection on the right. No scrolling.
+				// telemetry, status, and mode selection on the right. No scrolling.
 				Row {
 					id: cardRow
 
@@ -540,19 +425,136 @@ SwipeViewPage {
 						width: parent.width - leftColumn.width - cardRow.spacing
 						height: parent.height
 
+	// Live telemetry strip (transparent, theme-friendly)
+	Item {
+		id: statusIndicatorHeader
+
+		anchors {
+			top: parent.top
+			left: parent.left
+			right: parent.right
+		}
+		// Telemetry strip spans the top of the fixed two-column card.
+		visible: root.hasHeater
+		height: visible ? 64 : 0
+
+		readonly property var cells: [
+			{
+				icon: "qrc:/images/icon_checkmark_32.svg",
+				label: qsTr("Connection"),
+				value: (communicationAlarm.valid && communicationAlarm.value !== 0) ? qsTr("Alarm") : qsTr("Connected"),
+				valueColor: (communicationAlarm.valid && communicationAlarm.value !== 0) ? Theme.color_red : Theme.color_green,
+				iconColor: (communicationAlarm.valid && communicationAlarm.value !== 0) ? Theme.color_red : Theme.color_green
+			},
+			{
+				icon: "qrc:/images/icon_battery_24.svg",
+				label: qsTr("Battery"),
+				value: batteryVoltage.valid ? batteryVoltage.value.toFixed(1) + " V" : "--",
+				valueColor: Theme.color_font_primary,
+				iconColor: Theme.color_font_secondary
+			},
+			{
+				icon: "qrc:/images/icon_propeller.svg",
+				iconSize: 20,
+				label: qsTr("Fan"),
+				value: fanRpmActual.valid ? fanRpmActual.value + " " + qsTr("RPM") : "--",
+				valueColor: Theme.color_font_primary,
+				iconColor: Theme.color_font_secondary
+			},
+			{
+				icon: "qrc:/images/icon_engine_temp_32.svg",
+				label: qsTr("Heater"),
+				value: heaterTemperature.valid ? heaterTemperature.value + "\u00B0C" : "--",
+				valueColor: Theme.color_font_primary,
+				iconColor: Theme.color_font_secondary
+			},
+			{
+				icon: "qrc:/images/icon_temp_32.svg",
+				label: qsTr("Room"),
+				value: roomTemperature.valid
+						? root.formatTemperatureValue(roomTemperature)
+						: (internalTemperature.valid ? internalTemperature.value + "\u00B0C" : "--"),
+				valueColor: Theme.color_font_primary,
+				iconColor: Theme.color_font_secondary
+			}
+		]
+
+		RowLayout {
+			anchors {
+				fill: parent
+				leftMargin: 0
+				rightMargin: 0
+			}
+			spacing: 0
+
+			Repeater {
+				model: statusIndicatorHeader.cells
+
+				RowLayout {
+					id: statusCell
+
+					required property var modelData
+					required property int index
+
+					Layout.fillWidth: true
+					Layout.fillHeight: true
+					spacing: 10
+
+					Rectangle {
+						Layout.preferredWidth: 1
+						Layout.fillHeight: true
+						Layout.topMargin: 12
+						Layout.bottomMargin: 12
+						visible: statusCell.index > 0
+						color: Qt.rgba(1, 1, 1, 0.15)
+					}
+
+					CP.ColorImage {
+						Layout.alignment: Qt.AlignVCenter
+						Layout.preferredWidth: statusCell.modelData.iconSize !== undefined ? statusCell.modelData.iconSize : 22
+						Layout.preferredHeight: statusCell.modelData.iconSize !== undefined ? statusCell.modelData.iconSize : 22
+						source: statusCell.modelData.icon
+						color: statusCell.modelData.iconColor
+					}
+
+					ColumnLayout {
+						Layout.alignment: Qt.AlignVCenter
+						spacing: 0
+
+						Label {
+							Layout.fillWidth: true
+							font.pixelSize: Theme.font_size_caption
+							color: Theme.color_font_secondary
+							text: statusCell.modelData.label
+						}
+
+						Label {
+							Layout.fillWidth: true
+							font.pixelSize: Theme.font_size_body1
+							font.bold: true
+							elide: Label.ElideRight
+							color: statusCell.modelData.valueColor
+							text: statusCell.modelData.value
+						}
+					}
+				}
+			}
+		}
+	}
+
 						Rectangle {
 							id: statusCard
 
 							anchors {
-								top: parent.top
+								top: statusIndicatorHeader.bottom
+						topMargin: 12
 								left: parent.left
 								right: parent.right
 							}
 							height: 128
 							radius: 8
 							color: Qt.rgba(1, 1, 1, 0.05)
-							border.width: 1
-							border.color: root.panelStrokeColor
+
 
 							Label {
 								anchors {
