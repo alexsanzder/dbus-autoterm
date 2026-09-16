@@ -24,6 +24,7 @@ SwipeViewPage {
 	readonly property url flameIcon: Qt.resolvedUrl("../images/icon_flame.svg")
 	readonly property url infoIcon: Qt.resolvedUrl("../images/icon_info.svg")
 	readonly property url powerIcon: Qt.resolvedUrl("../images/icon_power.svg")
+	readonly property url pumpIcon: Qt.resolvedUrl("../images/icon_pump.svg")
 	property bool dialEnabled: false
 	property string selectedModeKey: ""
 	property string lastModeKey: ""
@@ -547,7 +548,7 @@ SwipeViewPage {
 									iconColor: Theme.color_font_secondary
 								},
 								{
-									icon: root.flameIcon,
+									icon: root.pumpIcon,
 									label: qsTr("Fuel Freq"),
 									value: fuelPumpFrequency.valid ? fuelPumpFrequency.value.toFixed(1) + " " + qsTr("Hz") : "--",
 									valueColor: Theme.color_font_primary,
