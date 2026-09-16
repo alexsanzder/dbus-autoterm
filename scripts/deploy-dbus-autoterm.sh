@@ -129,16 +129,30 @@ fi
 
 echo "Unpacking archive"
 tar -xzf "$archive_path" -C "$deploy_root"
-rm -rf "$app_dir"
+
+echo "Swapping app directory atomically"
+old_dir="$parent_dir/dbus-autoterm.old"
+rm -rf "$old_dir" || true
+if [ -d "$app_dir" ]; then
+    mv "$app_dir" "$old_dir"
+fi
 mv "$extracted_dir" "$app_dir"
 
 if [ -f "$backup_config" ]; then
     mv "$backup_config" "$app_dir/config.ini"
 fi
 
+# Best-effort removal of the old tree; supervise dirs can be busy while
+# runsv writes logs. Leftovers are cleaned up by the next deploy.
+rm -rf "$old_dir" 2>/dev/null || echo "NOTE: leftover $old_dir will be cleaned next deploy"
+
 echo "Running install.sh"
 cd "$app_dir"
 GUI_VARIANT="$gui_variant" bash install.sh
+
+if command -v svc >/dev/null 2>&1 && [ -e /service/dbus-autoterm ]; then
+    svc -u /service/dbus-autoterm || true
+fi
 
 echo "Cleaning up"
 rm -f "$archive_path"
