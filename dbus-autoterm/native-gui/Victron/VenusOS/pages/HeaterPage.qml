@@ -315,7 +315,7 @@ SwipeViewPage {
 					Item {
 						id: leftColumn
 
-						width: Math.round(parent.width * 0.52)
+						width: Math.round(parent.width * 0.50)
 						height: parent.height
 
 						Item {
@@ -535,14 +535,14 @@ SwipeViewPage {
 								},
 								{
 									icon: "qrc:/images/icon_engine_temp_32.svg",
-									label: qsTr("Heater"),
+									label: qsTr("Heater temp"),
 									value: root.heaterDisconnected ? "--" : (heaterTemperature.valid ? heaterTemperature.value + "\u00B0C" : "--"),
 									valueColor: root.heaterDisconnected ? Qt.alpha(Theme.color_font_primary, 0.5) : Theme.color_font_primary,
 									iconColor: root.heaterDisconnected ? Qt.alpha(Theme.color_font_secondary, 0.5) : Theme.color_font_secondary
 								},
 								{
 									icon: "qrc:/images/icon_temp_32.svg",
-									label: qsTr("Room"),
+									label: qsTr("Room temp"),
 									value: roomTemperature.valid
 										? root.formatTemperatureValue(roomTemperature)
 										: (internalTemperature.valid ? internalTemperature.value + "\u00B0C" : "--"),
@@ -551,7 +551,7 @@ SwipeViewPage {
 								},
 								{
 									icon: "qrc:/images/icon_temp_32.svg",
-									label: qsTr("Internal"),
+									label: qsTr("Internal temp"),
 									value: root.heaterDisconnected ? "--" : (internalTemperature.valid ? internalTemperature.value + "\u00B0C" : "--"),
 									valueColor: root.heaterDisconnected ? Qt.alpha(Theme.color_font_primary, 0.5) : Theme.color_font_primary,
 									iconColor: root.heaterDisconnected ? Qt.alpha(Theme.color_font_secondary, 0.5) : Theme.color_font_secondary
@@ -595,7 +595,7 @@ SwipeViewPage {
 												leftMargin: 12
 												rightMargin: 12
 											}
-											spacing: 10
+											spacing: 8
 
 											CP.ColorImage {
 												Layout.alignment: Qt.AlignVCenter
