@@ -418,15 +418,13 @@ SwipeViewPage {
 
 								Button {
 									id: powerChipButton
-									opacity: root.selectedModeKey === "" ? 0.5 : 1.0
-
 									height: 50
 									width: 50
 
 									text: ""
 									flat: false
-									backgroundColor: root.selectedModeKey === "" ? Theme.color_blue : Theme.color_gray1
-									borderColor: root.selectedModeKey === "" ? Theme.color_blue : Theme.color_gray1
+									backgroundColor: root.selectedModeKey === "" ? Qt.alpha(Theme.color_blue, 0.5) : Theme.color_gray1
+									borderColor: root.selectedModeKey === "" ? Qt.alpha(Theme.color_blue, 0.5) : Theme.color_gray1
 									color: Theme.color_white
 
 									onClicked: {
@@ -530,6 +528,7 @@ SwipeViewPage {
 									value: fanRpmActual.valid ? fanRpmActual.value + " " + qsTr("RPM") : "--",
 									valueColor: Theme.color_font_primary,
 									iconColor: Theme.color_font_secondary
+								
 								},
 								{
 									icon: "qrc:/images/icon_engine_temp_32.svg",
@@ -537,6 +536,7 @@ SwipeViewPage {
 									value: heaterTemperature.valid ? heaterTemperature.value + "\u00B0C" : "--",
 									valueColor: Theme.color_font_primary,
 									iconColor: Theme.color_font_secondary
+								
 								},
 								{
 									icon: "qrc:/images/icon_temp_32.svg",
@@ -546,20 +546,7 @@ SwipeViewPage {
 											: (internalTemperature.valid ? internalTemperature.value + "\u00B0C" : "--"),
 									valueColor: Theme.color_font_primary,
 									iconColor: Theme.color_font_secondary
-								},
-								{
-									icon: root.pumpIcon,
-									label: qsTr("Fuel Freq"),
-									value: fuelPumpFrequency.valid ? fuelPumpFrequency.value.toFixed(1) + " " + qsTr("Hz") : "--",
-									valueColor: Theme.color_font_primary,
-									iconColor: Theme.color_font_secondary
-								},
-								{
-									icon: "qrc:/images/icon_checkmark_32.svg",
-									label: qsTr("Status code"),
-									value: errorCode.valid ? errorCode.value : "--",
-									valueColor: (errorCode.valid && errorCode.value !== 0) ? Theme.color_red : Theme.color_font_primary,
-									iconColor: (errorCode.valid && errorCode.value !== 0) ? Theme.color_red : Theme.color_font_secondary
+								
 								},
 								{
 									icon: "qrc:/images/icon_temp_32.svg",
@@ -567,8 +554,24 @@ SwipeViewPage {
 									value: internalTemperature.valid ? internalTemperature.value + "\u00B0C" : "--",
 									valueColor: Theme.color_font_primary,
 									iconColor: Theme.color_font_secondary
-								}
-							]
+								
+								},
+								{
+									icon: "qrc:/images/icon_checkmark_32.svg",
+									label: qsTr("Status code"),
+									value: errorCode.valid ? errorCode.value : "--",
+									valueColor: (errorCode.valid && errorCode.value !== 0) ? Theme.color_red : Theme.color_font_primary,
+									iconColor: (errorCode.valid && errorCode.value !== 0) ? Theme.color_red : Theme.color_font_secondary
+								
+								},
+								{
+									icon: root.pumpIcon,
+									label: qsTr("Fuel Pump Freq"),
+									value: fuelPumpFrequency.valid ? fuelPumpFrequency.value.toFixed(1) + " " + qsTr("Hz") : "--",
+									valueColor: Theme.color_font_primary,
+									iconColor: Theme.color_font_secondary
+								
+								},]
 
 							GridLayout {
 								anchors.fill: parent
