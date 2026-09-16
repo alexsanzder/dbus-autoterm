@@ -9,7 +9,7 @@ fi
 
 GUI_VARIANT="${GUI_VARIANT:-default}"
 ARCHIVE="$ROOT_DIR/dist/dbus-autoterm.tar.gz"
-CERBO_HOST="${CERBO_HOST:-root@einstein}"
+CERBO_HOST="${CERBO_HOST:-${VENUS_TARGET:-root@einstein}}"
 CERBO_APP_DIR="${CERBO_APP_DIR:-/data/apps/dbus-autoterm}"
 CERBO_ARCHIVE_PATH="${CERBO_ARCHIVE_PATH:-/data/dbus-autoterm.tar.gz}"
 REMOTE_DEPLOY_SCRIPT="${REMOTE_DEPLOY_SCRIPT:-/data/dbus-autoterm-deploy.sh}"
