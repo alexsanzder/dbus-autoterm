@@ -23,6 +23,9 @@ SwipeViewPage {
 	readonly property url heaterIcon: Qt.resolvedUrl("../images/heater_bottom_bar.svg")
 	readonly property url flameIcon: Qt.resolvedUrl("../images/icon_flame.svg")
 	readonly property url infoIcon: Qt.resolvedUrl("../images/icon_info.svg")
+	readonly property url powerIcon: Qt.resolvedUrl("../images/icon_power.svg")
+	property bool dialEnabled: false
+	property bool powerSelected: true
 	readonly property bool hasHeater: !!currentHeater
 	readonly property bool isRunning: heaterState.valid && heaterState.value !== 0 && heaterState.value !== 10
 	readonly property bool isStarting: pendingStartStopAction === "start"
@@ -306,12 +309,13 @@ SwipeViewPage {
 								left: parent.left
 								right: parent.right
 							}
-							height: 340
+							height: 280
 
 							CircularHeaterRing {
 								id: ring
+								opacity: root.dialEnabled ? 1.0 : 0.35
 
-								width: Math.min(dialArea.width * 0.9, dialArea.height, 340)
+								width: Math.min(dialArea.width * 0.9, dialArea.height, 280)
 								height: width
 								anchors {
 									top: parent.top
@@ -329,8 +333,9 @@ SwipeViewPage {
 
 							// Steppers hug the ring's bottom opening
 							Row {
+								opacity: root.dialEnabled ? 1.0 : 0.45
 								anchors.top: ring.bottom
-								anchors.topMargin: -56
+								anchors.topMargin: -61
 								anchors.horizontalCenter: ring.horizontalCenter
 								spacing: 12
 
@@ -341,7 +346,7 @@ SwipeViewPage {
 									Button {
 										anchors.fill: parent
 										text: "\u2013"
-										enabled: root.canAdjustRingValue
+										enabled: root.canAdjustRingValue && root.dialEnabled
 										font.pixelSize: Theme.font_size_h2 - 5
 										color: Theme.color_font_secondary
 										onClicked: root.adjustRingValue(-1)
@@ -364,7 +369,7 @@ SwipeViewPage {
 									Button {
 										anchors.fill: parent
 										text: "+"
-										enabled: root.canAdjustRingValue
+										enabled: root.canAdjustRingValue && root.dialEnabled
 										font.pixelSize: Theme.font_size_h2 - 5
 										color: Theme.color_font_secondary
 										onClicked: root.adjustRingValue(1)
@@ -382,19 +387,49 @@ SwipeViewPage {
 							}
 						}
 
-						Column {
+						Item {
 							id: modeBlock
 
 							anchors {
 								top: dialArea.bottom
-								topMargin: 12
+								topMargin: 10
 								horizontalCenter: parent.horizontalCenter
 							}
-							spacing: 10
+							width: modeBlockRow.width
+							height: modeBlockRow.height
+
 
 							Row {
+								id: modeBlockRow
 								spacing: 12
 								anchors.horizontalCenter: parent.horizontalCenter
+
+								Button {
+									id: powerChipButton
+
+									height: 50
+									width: 50
+
+									text: ""
+									flat: false
+									backgroundColor: root.powerSelected ? Theme.color_blue : Theme.color_gray1
+									borderColor: root.powerSelected ? Theme.color_blue : Theme.color_gray1
+									color: Theme.color_white
+
+									onClicked: {
+										root.dialEnabled = !root.dialEnabled
+										root.powerSelected = root.dialEnabled
+									}
+
+									CP.ColorImage {
+										anchors.centerIn: parent
+										width: 22
+										height: 22
+										source: root.powerIcon
+										fillMode: Image.PreserveAspectFit
+										color: Theme.color_white
+									}
+								}
 
 								Repeater {
 									model: root.modeCards
@@ -571,7 +606,7 @@ SwipeViewPage {
 								left: parent.left
 								right: parent.right
 							}
-							height: 64
+							height: 91
 							radius: 8
 							color: "transparent"
 
