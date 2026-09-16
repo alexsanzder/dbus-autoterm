@@ -400,7 +400,7 @@ SwipeViewPage {
 
 							anchors {
 								top: dialArea.bottom
-								topMargin: 13
+								topMargin: 12
 								horizontalCenter: parent.horizontalCenter
 							}
 							width: modeBlockRow.width
@@ -626,7 +626,7 @@ SwipeViewPage {
 								left: parent.left
 								right: parent.right
 							}
-							height: 94
+							height: 93
 							radius: 8
 							color: "transparent"
 
