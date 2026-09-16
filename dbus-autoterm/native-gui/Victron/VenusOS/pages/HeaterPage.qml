@@ -465,6 +465,7 @@ SwipeViewPage {
 										text: ""
 										flat: false
 										enabled: selectable
+											opacity: selectable ? 1.0 : 0.5
 										backgroundColor: active ? Theme.color_blue : Theme.color_gray1
 										borderColor: active ? Theme.color_blue : Theme.color_gray1
 										color: Theme.color_white
@@ -663,6 +664,7 @@ SwipeViewPage {
 
 						Button {
 							id: actionButton
+								opacity: enabled ? 1.0 : 0.5
 
 							anchors {
 								left: parent.left
