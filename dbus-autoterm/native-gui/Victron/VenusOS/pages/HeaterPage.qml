@@ -22,6 +22,7 @@ SwipeViewPage {
 	readonly property string bindPrefix: currentHeater ? currentHeater.serviceUid : ""
 	readonly property url heaterIcon: Qt.resolvedUrl("../images/heater_bottom_bar.svg")
 	readonly property url flameIcon: Qt.resolvedUrl("../images/icon_flame.svg")
+	readonly property url infoIcon: Qt.resolvedUrl("../images/icon_info.svg")
 	readonly property bool hasHeater: !!currentHeater
 	readonly property bool isRunning: heaterState.valid && heaterState.value !== 0 && heaterState.value !== 10
 	readonly property bool isStarting: pendingStartStopAction === "start"
@@ -570,23 +571,39 @@ SwipeViewPage {
 								left: parent.left
 								right: parent.right
 							}
-							height: 96
+							height: 64
 							radius: 8
 							color: "transparent"
 
 
-							Label {
+							Row {
 								anchors {
-									fill: parent
-									margins: 12
+									left: parent.left
+									right: parent.right
+									bottom: parent.bottom
+									bottomMargin: 4
 								}
-								text: root.statusDescription
-								wrapMode: Text.WordWrap
-								maximumLineCount: 4
-								elide: Text.ElideRight
-								verticalAlignment: Text.AlignVCenter
-								color: Theme.color_font_primary
-								font.pixelSize: Theme.font_size_body1
+								spacing: 8
+
+								CP.ColorImage {
+									anchors.verticalCenter: parent.verticalCenter
+									width: 18
+									height: 18
+									source: root.infoIcon
+									fillMode: Image.PreserveAspectFit
+									color: Theme.color_font_secondary
+								}
+
+								Label {
+									width: parent.width - 26
+									text: root.statusDescription
+									wrapMode: Text.WordWrap
+									maximumLineCount: 2
+									elide: Text.ElideRight
+									verticalAlignment: Text.AlignBottom
+									color: Theme.color_font_primary
+									font.pixelSize: Theme.font_size_body1
+								}
 							}
 						}
 
