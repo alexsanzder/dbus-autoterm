@@ -427,17 +427,17 @@ SwipeViewPage {
 										anchors.fill: parent
 										text: "\u2013"
 										enabled: root.canAdjustRingValue
-										font.pixelSize: Theme.font_size_h2
+										font.pixelSize: Theme.font_size_h2 - 5
 										onClicked: root.adjustRingValue(-1)
 									}
 
-									// White circular 1.5px border overlay
+									// Gray circular 1.5px border overlay
 									Rectangle {
 										anchors.fill: parent
 										radius: width / 2
 										color: "transparent"
 										border.width: 1.5
-										border.color: Theme.color_white
+										border.color: Theme.color_font_secondary
 									}
 								}
 
@@ -449,17 +449,17 @@ SwipeViewPage {
 										anchors.fill: parent
 										text: "+"
 										enabled: root.canAdjustRingValue
-										font.pixelSize: Theme.font_size_h2
+										font.pixelSize: Theme.font_size_h2 - 5
 										onClicked: root.adjustRingValue(1)
 									}
 
-									// White circular 1.5px border overlay
+									// Gray circular 1.5px border overlay
 									Rectangle {
 										anchors.fill: parent
 										radius: width / 2
 										color: "transparent"
 										border.width: 1.5
-										border.color: Theme.color_white
+										border.color: Theme.color_font_secondary
 									}
 								}
 							}
