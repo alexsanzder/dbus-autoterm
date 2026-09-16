@@ -482,7 +482,7 @@ SwipeViewPage {
 										enabled: selectable
 										backgroundColor: active ? Theme.color_blue : Theme.color_gray1
 										borderColor: active ? Theme.color_blue : Theme.color_gray1
-										color: chipButton.selectable ? Theme.color_white : Qt.alpha(Theme.color_white, 0.5)
+										color: chipButton.selectable ? Theme.color_white : Theme.color_font_secondary
 
 										onClicked: {
 											root.selectedModeKey = modelData.key
@@ -560,7 +560,7 @@ SwipeViewPage {
 									icon: root.heaterDisconnected ? root.alertIcon : "qrc:/images/icon_checkmark_32.svg",
 									label: qsTr("Status"),
 									value: root.heaterDisconnected ? qsTr("Disconnected") : ((errorCode.valid && errorCode.value !== 0) ? qsTr("Error") : qsTr("OK")),
-									valueColor: Theme.color_font_primary,
+									valueColor: root.heaterDisconnected ? Qt.alpha(Theme.color_font_primary, 0.5) : Theme.color_font_primary,
 									iconColor: root.heaterDisconnected ? Theme.color_red : Theme.color_green
 								},
 								{
