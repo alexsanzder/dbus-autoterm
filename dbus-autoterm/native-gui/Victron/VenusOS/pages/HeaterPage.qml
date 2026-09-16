@@ -118,15 +118,6 @@ SwipeViewPage {
 				return "Idle"
 		}
 	}
-	// Label of the active mode, shown under the mode chips.
-	readonly property string activeModeLabel: {
-		for (let i = 0; i < modeCards.length; ++i) {
-			if (modeCards[i].key === activeModeCardKey) {
-				return modeCards[i].label
-			}
-		}
-		return ""
-	}
 	// Live status line: replaces the static description while the heater
 	// transitions or runs, showing real telemetry for the active mode.
 	readonly property string statusDescription: {
@@ -313,7 +304,7 @@ SwipeViewPage {
 								top: parent.top
 								left: parent.left
 								right: parent.right
-								bottom: actionButton.top
+								bottom: modeBlock.top
 								bottomMargin: 12
 							}
 
@@ -387,34 +378,55 @@ SwipeViewPage {
 							}
 						}
 
-						Button {
-							id: actionButton
+						Column {
+							id: modeBlock
 
 							anchors {
-								left: parent.left
-								right: parent.right
 								bottom: parent.bottom
+								horizontalCenter: parent.horizontalCenter
 							}
-							height: 64
-							text: root.actionLabel
-							enabled: startStop.valid && !root.isTransitioning
-							flat: false
-							backgroundColor: root.pendingStartStopAction === "start"
-								? Theme.color_darkBlue
-								: (root.pendingStartStopAction === "stop"
-									? Theme.color_darkRed
-									: (root.isRunning ? Theme.color_red : Theme.color_blue))
-							borderColor: root.pendingStartStopAction === "start"
-								? Theme.color_darkBlue
-								: (root.pendingStartStopAction === "stop"
-									? Theme.color_darkRed
-									: (root.isRunning ? Theme.color_red : Theme.color_blue))
-							color: Theme.color_white
-							font.pixelSize: Theme.font_size_body1
-							font.bold: true
-							onClicked: Global.dialogLayer.open(startStopDialogComponent, {
-								startRequested: !root.isRunning,
-							})
+							spacing: 10
+
+							Row {
+								spacing: 12
+								anchors.horizontalCenter: parent.horizontalCenter
+
+								Repeater {
+									model: root.modeCards
+
+									Button {
+										id: chipButton
+
+										required property var modelData
+
+										readonly property bool active: modelData.key === root.activeModeCardKey
+										readonly property bool roomSensorMode: modelData.modeValue === 1 || modelData.modeValue === 3
+										readonly property bool supported: modelData.modeValue >= 0
+										readonly property bool selectable: supported && (!roomSensorMode || root.hasRoomTemperatureControl)
+
+										height: 58
+										width: 58
+
+										text: ""
+										flat: false
+										enabled: selectable
+										backgroundColor: active ? Theme.color_blue : Theme.color_gray1
+										borderColor: active ? Theme.color_blue : Theme.color_gray1
+										color: Theme.color_white
+
+										onClicked: root.requestModeChange(modelData.modeValue, modelData.label)
+
+										CP.ColorImage {
+											anchors.centerIn: parent
+											width: 26
+											height: 26
+											source: chipButton.modelData.icon
+											fillMode: Image.PreserveAspectFit
+											color: Theme.color_white
+										}
+									}
+								}
+							}
 						}
 					}
 
@@ -571,62 +583,34 @@ SwipeViewPage {
 							}
 						}
 
-						Column {
-							id: modeBlock
+						Button {
+							id: actionButton
 
 							anchors {
+								left: parent.left
+								right: parent.right
 								bottom: parent.bottom
-								horizontalCenter: parent.horizontalCenter
 							}
-							spacing: 10
-
-							Label {
-								anchors.horizontalCenter: parent.horizontalCenter
-								text: root.activeModeLabel
-								color: Theme.color_font_secondary
-								font.pixelSize: Theme.font_size_body1
-							}
-
-							Row {
-								spacing: 12
-								anchors.horizontalCenter: parent.horizontalCenter
-
-								Repeater {
-									model: root.modeCards
-
-									Button {
-										id: chipButton
-
-										required property var modelData
-
-										readonly property bool active: modelData.key === root.activeModeCardKey
-										readonly property bool roomSensorMode: modelData.modeValue === 1 || modelData.modeValue === 3
-										readonly property bool supported: modelData.modeValue >= 0
-										readonly property bool selectable: supported && (!roomSensorMode || root.hasRoomTemperatureControl)
-
-										height: 58
-										width: 58
-
-										text: ""
-										flat: false
-										enabled: selectable
-										backgroundColor: active ? Theme.color_blue : Theme.color_gray1
-										borderColor: active ? Theme.color_blue : Theme.color_gray1
-										color: Theme.color_white
-
-										onClicked: root.requestModeChange(modelData.modeValue, modelData.label)
-
-										CP.ColorImage {
-											anchors.centerIn: parent
-											width: 26
-											height: 26
-											source: chipButton.modelData.icon
-											fillMode: Image.PreserveAspectFit
-											color: Theme.color_white
-										}
-									}
-								}
-							}
+							height: 64
+							text: root.actionLabel
+							enabled: startStop.valid && !root.isTransitioning
+							flat: false
+							backgroundColor: root.pendingStartStopAction === "start"
+								? Theme.color_darkBlue
+								: (root.pendingStartStopAction === "stop"
+									? Theme.color_darkRed
+									: (root.isRunning ? Theme.color_red : Theme.color_blue))
+							borderColor: root.pendingStartStopAction === "start"
+								? Theme.color_darkBlue
+								: (root.pendingStartStopAction === "stop"
+									? Theme.color_darkRed
+									: (root.isRunning ? Theme.color_red : Theme.color_blue))
+							color: Theme.color_white
+							font.pixelSize: Theme.font_size_body1
+							font.bold: true
+							onClicked: Global.dialogLayer.open(startStopDialogComponent, {
+								startRequested: !root.isRunning,
+							})
 						}
 					}
 				}
