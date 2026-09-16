@@ -431,12 +431,12 @@ SwipeViewPage {
 										onClicked: root.adjustRingValue(-1)
 									}
 
-									// White rounded 2px border overlay
+									// White circular 1.5px border overlay
 									Rectangle {
 										anchors.fill: parent
-										radius: 8
+										radius: width / 2
 										color: "transparent"
-										border.width: 2
+										border.width: 1.5
 										border.color: Theme.color_white
 									}
 								}
@@ -453,12 +453,12 @@ SwipeViewPage {
 										onClicked: root.adjustRingValue(1)
 									}
 
-									// White rounded 2px border overlay
+									// White circular 1.5px border overlay
 									Rectangle {
 										anchors.fill: parent
-										radius: 8
+										radius: width / 2
 										color: "transparent"
-										border.width: 2
+										border.width: 1.5
 										border.color: Theme.color_white
 									}
 								}
@@ -507,6 +507,15 @@ SwipeViewPage {
 									}
 								}
 							}
+						}
+
+						Label {
+							width: parent.width
+							horizontalAlignment: Text.AlignHCenter
+							wrapMode: Text.WordWrap
+							text: root.statusDescription
+							color: Theme.color_font_secondary
+							font.pixelSize: Theme.font_size_caption
 						}
 
 						Button {

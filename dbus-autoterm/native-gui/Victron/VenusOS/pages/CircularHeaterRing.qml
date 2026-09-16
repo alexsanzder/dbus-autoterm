@@ -56,27 +56,18 @@ Item {
 			border.width: 1
 			border.color: root.centerStrokeColor
 
-			// Live status line pinned to the top of the dial center
-			Label {
-				anchors {
-					top: parent.top
-					topMargin: 14
-					horizontalCenter: parent.horizontalCenter
-				}
-				width: parent.width - 20
-				horizontalAlignment: Text.AlignHCenter
-				wrapMode: Text.WordWrap
-				maximumLineCount: 2
-				elide: Text.ElideRight
-				visible: text !== ""
-				text: root.statusValue
-				font.pixelSize: Theme.font_size_caption
-				color: root.captionValueColor
-			}
-
 			Column {
 				anchors.centerIn: parent
-				spacing: 4
+				spacing: 6
+
+				// Active mode, right above the big value
+				Label {
+					anchors.horizontalCenter: parent.horizontalCenter
+					visible: text !== ""
+					text: root.statusValue
+					font.pixelSize: Theme.font_size_caption
+					color: root.captionValueColor
+				}
 
 				Label {
 					anchors.horizontalCenter: parent.horizontalCenter
@@ -100,7 +91,7 @@ Item {
 					anchors.horizontalCenter: parent.horizontalCenter
 					visible: text !== ""
 					text: root.captionValue
-					font.pixelSize: Theme.font_size_caption
+					font.pixelSize: Theme.font_size_body1 * 1.2
 					color: root.captionValueColor
 				}
 			}
