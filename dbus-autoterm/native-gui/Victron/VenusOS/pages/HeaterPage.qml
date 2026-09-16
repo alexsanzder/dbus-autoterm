@@ -25,10 +25,12 @@ SwipeViewPage {
 	readonly property url infoIcon: Qt.resolvedUrl("../images/icon_info.svg")
 	readonly property url powerIcon: Qt.resolvedUrl("../images/icon_power.svg")
 	readonly property url pumpIcon: Qt.resolvedUrl("../images/icon_pump.svg")
+	readonly property url alertIcon: Qt.resolvedUrl("../images/icon_alert.svg")
 	property bool dialEnabled: false
 	property string selectedModeKey: ""
 	property string lastModeKey: ""
 	readonly property bool hasHeater: !!currentHeater
+	readonly property bool heaterDisconnected: communicationAlarm.valid && communicationAlarm.value !== 0
 	readonly property bool isRunning: heaterState.valid && heaterState.value !== 0 && heaterState.value !== 10
 	readonly property bool isStarting: pendingStartStopAction === "start"
 	readonly property bool isStopping: pendingStartStopAction === "stop"
@@ -137,6 +139,9 @@ SwipeViewPage {
 	// Live status line: replaces the static description while the heater
 	// transitions or runs, showing real telemetry for the active mode.
 	readonly property string statusDescription: {
+		if (root.heaterDisconnected) {
+			return "Heater not connected."
+		}
 		if (!stateText.valid) {
 			return activeModeDescription
 		}
@@ -467,7 +472,7 @@ SwipeViewPage {
 										readonly property bool active: modelData.key === root.selectedModeKey
 										readonly property bool roomSensorMode: modelData.modeValue === 1 || modelData.modeValue === 3
 										readonly property bool supported: modelData.modeValue >= 0
-										readonly property bool selectable: supported && (!roomSensorMode || root.hasRoomTemperatureControl)
+										readonly property bool selectable: supported
 
 											height: 50
 											width: 50
@@ -559,8 +564,8 @@ SwipeViewPage {
 								{
 									icon: "qrc:/images/icon_checkmark_32.svg",
 									label: qsTr("Status code"),
-									value: errorCode.valid ? errorCode.value : "--",
-									valueColor: (errorCode.valid && errorCode.value !== 0) ? Theme.color_red : Theme.color_font_primary,
+									value: root.heaterDisconnected ? qsTr("Disconnected") : (errorCode.valid ? errorCode.value : "--"),
+									valueColor: (root.heaterDisconnected || (errorCode.valid && errorCode.value !== 0)) ? Theme.color_red : Theme.color_font_primary,
 									iconColor: (errorCode.valid && errorCode.value !== 0) ? Theme.color_red : Theme.color_font_secondary
 								
 								},
@@ -660,9 +665,9 @@ SwipeViewPage {
 									anchors.verticalCenter: parent.verticalCenter
 									width: 18
 									height: 18
-									source: root.infoIcon
+									source: root.heaterDisconnected ? root.alertIcon : root.infoIcon
 									fillMode: Image.PreserveAspectFit
-									color: Theme.color_font_secondary
+									color: root.heaterDisconnected ? Theme.color_red : Theme.color_font_secondary
 								}
 
 								Label {
@@ -672,7 +677,7 @@ SwipeViewPage {
 									maximumLineCount: 2
 									elide: Text.ElideRight
 									verticalAlignment: Text.AlignBottom
-									color: Theme.color_font_secondary
+									color: root.heaterDisconnected ? Theme.color_red : Theme.color_font_secondary
 									font.pixelSize: Theme.font_size_body1
 								}
 							}

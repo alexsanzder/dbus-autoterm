@@ -19,6 +19,7 @@ ADDED_FILES=(
     "images/icon_info.svg"
     "images/icon_power.svg"
     "images/icon_pump.svg"
+    "images/icon_alert.svg"
     "pages/CircularHeaterRing.qml"
     "pages/HeaterPage.qml"
     "pages/HeaterTab.qml"

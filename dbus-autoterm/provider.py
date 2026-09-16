@@ -418,11 +418,16 @@ class SerialHeaterProvider:
 
     def refresh(self) -> HeaterSnapshot:
         if self._stream is None:
-            self._stream = SerialByteStream(self._config.device, self._config.profile.baudrate)
+            try:
+                self._stream = SerialByteStream(self._config.device, self._config.profile.baudrate)
+            except Exception as exc:
+                LOG.warning("serial device unavailable; remaining disconnected: %s", exc)
+                self._mark_disconnected()
+                return self._snapshot
         if not self._health.connected:
             try:
                 self._establish_session()
-            except (TimeoutError, ProtocolError) as exc:
+            except Exception as exc:
                 LOG.warning("serial session establish failed; remaining disconnected: %s", exc)
                 self._mark_disconnected()
                 return self._snapshot
@@ -435,7 +440,7 @@ class SerialHeaterProvider:
                 self._snapshot = apply_status(self._snapshot, status)
                 self._health.connected = True
                 self._snapshot.connected = True
-        except (TimeoutError, ProtocolError) as exc:
+        except Exception as exc:
             LOG.warning("status refresh failed; keeping previous snapshot: %s", exc)
             self._mark_disconnected()
         return self._snapshot

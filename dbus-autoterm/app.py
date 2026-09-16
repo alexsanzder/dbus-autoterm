@@ -49,14 +49,18 @@ class HeaterDriverApp:
         self.config_path = config_path
 
     def startstop(self, enabled: bool) -> bool:
-        if enabled:
-            if self.dbus_adapter.current_heater_mode == HeaterUiMode.VENTILATION:
-                snapshot = self.provider.start_ventilation(self.provider.get_snapshot().settings.power_level)
+        try:
+            if enabled:
+                if self.dbus_adapter.current_heater_mode == HeaterUiMode.VENTILATION:
+                    snapshot = self.provider.start_ventilation(self.provider.get_snapshot().settings.power_level)
+                else:
+                    snapshot = self.provider.start(self.provider.get_snapshot().settings)
             else:
-                snapshot = self.provider.start(self.provider.get_snapshot().settings)
-        else:
-            snapshot = self.provider.stop()
-        self._publish_snapshot_with_room_context(snapshot)
+                snapshot = self.provider.stop()
+            self._publish_snapshot_with_room_context(snapshot)
+        except Exception:
+            LOG.exception("startstop command failed; heater likely disconnected")
+            self._publish_snapshot_with_room_context(self.provider.get_snapshot())
         return True
 
     def run_once(self) -> None:
@@ -126,14 +130,18 @@ class HeaterDriverApp:
         return True
 
     def _update_settings(self, **changes) -> bool:
-        current_snapshot = self.provider.get_snapshot()
-        settings = replace(current_snapshot.settings, **changes)
-        active = current_snapshot.phase in {HeaterPhase.STARTING, HeaterPhase.WARMING_UP, HeaterPhase.RUNNING}
-        if self.dbus_adapter.current_heater_mode == HeaterUiMode.VENTILATION:
-            snapshot = self.provider.start_ventilation(settings.power_level) if active else self.provider.update_settings(settings)
-        else:
-            snapshot = self.provider.update_settings(settings)
-        self._publish_snapshot_with_room_context(snapshot)
+        try:
+            current_snapshot = self.provider.get_snapshot()
+            settings = replace(current_snapshot.settings, **changes)
+            active = current_snapshot.phase in {HeaterPhase.STARTING, HeaterPhase.WARMING_UP, HeaterPhase.RUNNING}
+            if self.dbus_adapter.current_heater_mode == HeaterUiMode.VENTILATION:
+                snapshot = self.provider.start_ventilation(settings.power_level) if active else self.provider.update_settings(settings)
+            else:
+                snapshot = self.provider.update_settings(settings)
+            self._publish_snapshot_with_room_context(snapshot)
+        except Exception:
+            LOG.exception("settings update failed; heater likely disconnected")
+            self._publish_snapshot_with_room_context(self.provider.get_snapshot())
         return True
 
     def _persist_room_temperature_service(self, service_name: str) -> None:
