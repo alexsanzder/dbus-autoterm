@@ -305,7 +305,7 @@ SwipeViewPage {
 								left: parent.left
 								right: parent.right
 								bottom: modeBlock.top
-								bottomMargin: 12
+								bottomMargin: 20
 							}
 
 							CircularHeaterRing {
@@ -313,7 +313,11 @@ SwipeViewPage {
 
 								width: Math.min(dialArea.width * 0.9, dialArea.height, 340)
 								height: width
-								anchors.centerIn: parent
+								anchors {
+									top: parent.top
+									horizontalCenter: parent.horizontalCenter
+									topMargin: 0
+								}
 
 								valueRatio: root.ringValueRatio
 								progressColor: root.ringStateColor
