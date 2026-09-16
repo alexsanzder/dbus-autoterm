@@ -103,7 +103,7 @@ SwipeViewPage {
 				return "Cooling down"
 			case "running":
 				if (showTemperatureControl) {
-					return "Heating"
+					return "Heating to"
 				}
 				if (showPowerControl) {
 					return "Heating level"
