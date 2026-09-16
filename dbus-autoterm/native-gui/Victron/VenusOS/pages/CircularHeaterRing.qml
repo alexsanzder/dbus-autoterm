@@ -16,6 +16,7 @@ Item {
 	property string primaryValue: ""
 	property string secondaryValue: ""
 	property string captionValue: ""
+	property string statusValue: ""
 	property real primaryValueFontScale: 1.8
 	property real secondaryValueFontScale: 1.2
 
@@ -54,6 +55,24 @@ Item {
 			color: root.centerFillColor
 			border.width: 1
 			border.color: root.centerStrokeColor
+
+			// Live status line pinned to the top of the dial center
+			Label {
+				anchors {
+					top: parent.top
+					topMargin: 14
+					horizontalCenter: parent.horizontalCenter
+				}
+				width: parent.width - 20
+				horizontalAlignment: Text.AlignHCenter
+				wrapMode: Text.WordWrap
+				maximumLineCount: 2
+				elide: Text.ElideRight
+				visible: text !== ""
+				text: root.statusValue
+				font.pixelSize: Theme.font_size_caption
+				color: root.captionValueColor
+			}
 
 			Column {
 				anchors.centerIn: parent

@@ -386,7 +386,7 @@ SwipeViewPage {
 							id: dialArea
 
 							width: ring.width
-							height: ring.height
+							height: ring.height + 12
 							anchors.horizontalCenter: parent.horizontalCenter
 
 							CircularHeaterRing {
@@ -400,16 +400,19 @@ SwipeViewPage {
 								primaryValue: root.ringPrimaryValue
 								secondaryValue: ""
 								captionValue: root.ringCurrentTempCaption
+								statusValue: root.statusDescription
 							}
-						}
 
-						Row {
-								spacing: 48
-								anchors.horizontalCenter: parent.horizontalCenter
+							// Steppers hug the ring's bottom opening, like the previous design
+							Row {
+								anchors.top: ring.bottom
+								anchors.topMargin: -48
+								anchors.horizontalCenter: ring.horizontalCenter
+								spacing: 12
 
 								Button {
-									width: 60
-									height: 60
+									width: 56
+									height: 56
 									text: "\u2013"
 									enabled: root.canAdjustRingValue
 									font.pixelSize: Theme.font_size_h2
@@ -417,8 +420,8 @@ SwipeViewPage {
 								}
 
 								Button {
-									width: 60
-									height: 60
+									width: 56
+									height: 56
 									text: "+"
 									enabled: root.canAdjustRingValue
 									font.pixelSize: Theme.font_size_h2
@@ -426,15 +429,7 @@ SwipeViewPage {
 								}
 							}
 
-
-							Label {
-								width: parent.width
-								horizontalAlignment: Text.AlignHCenter
-								wrapMode: Text.WordWrap
-								text: root.statusDescription
-								color: Theme.color_font_secondary
-								font.pixelSize: Theme.font_size_caption
-							}
+						}
 
 						Row {
 							id: modeChips
