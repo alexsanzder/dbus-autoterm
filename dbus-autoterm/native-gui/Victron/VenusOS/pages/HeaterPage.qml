@@ -620,7 +620,7 @@ SwipeViewPage {
 												Label {
 													Layout.fillWidth: true
 													font.pixelSize: Theme.font_size_body1
-													font.bold: true
+													font.bold: modelData.valueBold !== undefined ? modelData.valueBold : true
 													elide: Label.ElideRight
 													color: modelData.valueColor
 													text: modelData.value
