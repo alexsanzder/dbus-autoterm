@@ -480,10 +480,9 @@ SwipeViewPage {
 										text: ""
 										flat: false
 										enabled: selectable
-											opacity: selectable ? 1.0 : 0.5
 										backgroundColor: active ? Theme.color_blue : Theme.color_gray1
 										borderColor: active ? Theme.color_blue : Theme.color_gray1
-										color: Theme.color_white
+										color: chipButton.selectable ? Theme.color_white : Qt.alpha(Theme.color_white, 0.5)
 
 										onClicked: {
 											root.selectedModeKey = modelData.key
@@ -530,53 +529,48 @@ SwipeViewPage {
 									icon: "qrc:/images/icon_propeller.svg",
 									iconSize: 20,
 									label: qsTr("Fan"),
-									value: fanRpmActual.valid ? fanRpmActual.value + " " + qsTr("RPM") : "--",
-									valueColor: Theme.color_font_primary,
-									iconColor: Theme.color_font_secondary
-								
+									value: root.heaterDisconnected ? "--" : (fanRpmActual.valid ? fanRpmActual.value + " " + qsTr("RPM") : "--"),
+									valueColor: root.heaterDisconnected ? Qt.alpha(Theme.color_font_primary, 0.5) : Theme.color_font_primary,
+									iconColor: root.heaterDisconnected ? Qt.alpha(Theme.color_font_secondary, 0.5) : Theme.color_font_secondary
 								},
 								{
 									icon: "qrc:/images/icon_engine_temp_32.svg",
 									label: qsTr("Heater"),
-									value: heaterTemperature.valid ? heaterTemperature.value + "\u00B0C" : "--",
-									valueColor: Theme.color_font_primary,
-									iconColor: Theme.color_font_secondary
-								
+									value: root.heaterDisconnected ? "--" : (heaterTemperature.valid ? heaterTemperature.value + "\u00B0C" : "--"),
+									valueColor: root.heaterDisconnected ? Qt.alpha(Theme.color_font_primary, 0.5) : Theme.color_font_primary,
+									iconColor: root.heaterDisconnected ? Qt.alpha(Theme.color_font_secondary, 0.5) : Theme.color_font_secondary
 								},
 								{
 									icon: "qrc:/images/icon_temp_32.svg",
 									label: qsTr("Room"),
 									value: roomTemperature.valid
-											? root.formatTemperatureValue(roomTemperature)
-											: (internalTemperature.valid ? internalTemperature.value + "\u00B0C" : "--"),
+										? root.formatTemperatureValue(roomTemperature)
+										: (internalTemperature.valid ? internalTemperature.value + "\u00B0C" : "--"),
 									valueColor: Theme.color_font_primary,
 									iconColor: Theme.color_font_secondary
-								
 								},
 								{
 									icon: "qrc:/images/icon_temp_32.svg",
 									label: qsTr("Internal"),
-									value: internalTemperature.valid ? internalTemperature.value + "\u00B0C" : "--",
-									valueColor: Theme.color_font_primary,
-									iconColor: Theme.color_font_secondary
-								
+									value: root.heaterDisconnected ? "--" : (internalTemperature.valid ? internalTemperature.value + "\u00B0C" : "--"),
+									valueColor: root.heaterDisconnected ? Qt.alpha(Theme.color_font_primary, 0.5) : Theme.color_font_primary,
+									iconColor: root.heaterDisconnected ? Qt.alpha(Theme.color_font_secondary, 0.5) : Theme.color_font_secondary
 								},
 								{
-									icon: "qrc:/images/icon_checkmark_32.svg",
-									label: qsTr("Status code"),
-									value: root.heaterDisconnected ? qsTr("Disconnected") : (errorCode.valid ? errorCode.value : "--"),
-									valueColor: (root.heaterDisconnected || (errorCode.valid && errorCode.value !== 0)) ? Theme.color_red : Theme.color_font_primary,
-									iconColor: (errorCode.valid && errorCode.value !== 0) ? Theme.color_red : Theme.color_font_secondary
-								
+									icon: root.heaterDisconnected ? root.alertIcon : "qrc:/images/icon_checkmark_32.svg",
+									label: qsTr("Status"),
+									value: root.heaterDisconnected ? qsTr("Disconnected") : ((errorCode.valid && errorCode.value !== 0) ? qsTr("Error") : qsTr("OK")),
+									valueColor: Theme.color_font_primary,
+									iconColor: root.heaterDisconnected ? Theme.color_red : Theme.color_green
 								},
 								{
 									icon: root.pumpIcon,
 									label: qsTr("Fuel Pump Freq"),
-									value: fuelPumpFrequency.valid ? fuelPumpFrequency.value.toFixed(1) + " " + qsTr("Hz") : "--",
-									valueColor: Theme.color_font_primary,
-									iconColor: Theme.color_font_secondary
-								
-								},]
+									value: root.heaterDisconnected ? "--" : (fuelPumpFrequency.valid ? fuelPumpFrequency.value.toFixed(1) + " " + qsTr("Hz") : "--"),
+									valueColor: root.heaterDisconnected ? Qt.alpha(Theme.color_font_primary, 0.5) : Theme.color_font_primary,
+									iconColor: root.heaterDisconnected ? Qt.alpha(Theme.color_font_secondary, 0.5) : Theme.color_font_secondary
+								}
+							]
 
 							GridLayout {
 								anchors.fill: parent
