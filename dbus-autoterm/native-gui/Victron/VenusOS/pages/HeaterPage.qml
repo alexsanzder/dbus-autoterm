@@ -479,10 +479,10 @@ SwipeViewPage {
 
 										text: ""
 										flat: false
-										enabled: selectable
+										enabled: selectable && !root.heaterDisconnected
 										backgroundColor: active ? Theme.color_blue : Theme.color_gray1
 										borderColor: active ? Theme.color_blue : Theme.color_gray1
-										color: chipButton.selectable ? Theme.color_white : Theme.color_font_secondary
+										color: (chipButton.selectable && !root.heaterDisconnected) ? Theme.color_white : Theme.color_font_secondary
 
 										onClicked: {
 											root.selectedModeKey = modelData.key
