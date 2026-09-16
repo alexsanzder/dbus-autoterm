@@ -118,37 +118,9 @@ SwipeViewPage {
 		}
 		return activeModeDescription
 	}
-	// Compact state caption shown inside the dial, Home Assistant style.
-	readonly property string ringCaption: {
-		if (!stateText.valid) {
-			return "Idle"
-		}
-		if (stateText.value === "not connected") {
-			return "Not connected"
-		}
-		if (stateText.value === "fault") {
-			return "Fault"
-		}
-		if (stateText.value === "starting" || stateText.value === "starting ventilation") {
-			return "Starting..."
-		}
-		if (stateText.value === "warming up") {
-			return "Warming up"
-		}
-		if (stateText.value === "shutting down" || stateText.value === "stopping ventilation") {
-			return "Cooling down"
-		}
-		if (stateText.value === "running") {
-			if (showPowerControl) {
-				return powerLevel.valid ? "Power level " + powerLevel.value : "Heating"
-			}
-			return targetTemperature.valid ? "Heating to " + formatTemperatureValue(targetTemperature) : "Heating"
-		}
-		if (stateText.value === "ventilation") {
-			return "Ventilating"
-		}
-		return "Idle"
-	}
+	// Compact caption inside the dial: the current temperature.
+	readonly property string ringCurrentTempCaption: formatTemperatureValue(displayTemperatureItem)
+
 	readonly property var tabModel: {
 		const tabs = []
 		if (!heaterModel) {
@@ -172,17 +144,16 @@ SwipeViewPage {
 	readonly property bool canAdjustRingValue: showPowerControl
 		? powerLevel.valid
 		: (showTemperatureControl && targetTemperature.valid)
-	// Big center value: room temperature when a room source exists, otherwise
-	// the heater internal sensor, matching the telemetry strip fallback.
+	// Current temperature shown as the dial caption: room temperature when a
+	// room source exists, otherwise the heater internal sensor.
 	readonly property var displayTemperatureItem: roomTemperature.valid
 		? roomTemperature
 		: (internalTemperature.valid ? internalTemperature : heaterTemperature)
-	readonly property string targetValueLabel: showPowerControl
-		? (powerLevel.valid ? "Level " + powerLevel.value : "Level --")
+	// Big center value: the value the ring steppers set — target temperature
+	// in temperature modes, power level in power/ventilation modes.
+	readonly property string ringPrimaryValue: showPowerControl
+		? (powerLevel.valid ? powerLevel.value : "--")
 		: (targetTemperature.valid ? formatTemperatureValue(targetTemperature) : "--")
-	readonly property string targetValueCaption: showPowerControl
-		? "Power level"
-		: "Target temperature"
 
 	topLeftButton: VenusOS.StatusBar_LeftButton_ControlsInactive
 	fullScreenWhenIdle: true
@@ -426,63 +397,44 @@ SwipeViewPage {
 
 								valueRatio: root.ringValueRatio
 								progressColor: root.ringStateColor
-								primaryValue: root.formatTemperatureValue(root.displayTemperatureItem)
+								primaryValue: root.ringPrimaryValue
 								secondaryValue: ""
-								captionValue: root.ringCaption
+								captionValue: root.ringCurrentTempCaption
 							}
 						}
 
 						Row {
-							spacing: 24
-							anchors.horizontalCenter: parent.horizontalCenter
+								spacing: 48
+								anchors.horizontalCenter: parent.horizontalCenter
 
-							Button {
-								width: 60
-								height: 60
-								text: "\u2013"
-								enabled: root.canAdjustRingValue
-								font.pixelSize: Theme.font_size_h2
-								onClicked: root.adjustRingValue(-1)
-							}
-
-							Column {
-								spacing: 2
-								anchors.verticalCenter: parent.verticalCenter
-
-								Label {
-									anchors.horizontalCenter: parent.horizontalCenter
-									text: root.targetValueCaption
-									color: Theme.color_font_secondary
-									font.pixelSize: Theme.font_size_caption
-								}
-
-								Label {
-									anchors.horizontalCenter: parent.horizontalCenter
-									text: root.targetValueLabel
-									color: Theme.color_font_primary
-									font.bold: true
+								Button {
+									width: 60
+									height: 60
+									text: "\u2013"
+									enabled: root.canAdjustRingValue
 									font.pixelSize: Theme.font_size_h2
+									onClicked: root.adjustRingValue(-1)
+								}
+
+								Button {
+									width: 60
+									height: 60
+									text: "+"
+									enabled: root.canAdjustRingValue
+									font.pixelSize: Theme.font_size_h2
+									onClicked: root.adjustRingValue(1)
 								}
 							}
 
-							Button {
-								width: 60
-								height: 60
-								text: "+"
-								enabled: root.canAdjustRingValue
-								font.pixelSize: Theme.font_size_h2
-								onClicked: root.adjustRingValue(1)
-							}
-						}
 
-						Label {
-							width: parent.width
-							horizontalAlignment: Text.AlignHCenter
-							wrapMode: Text.WordWrap
-							text: root.statusDescription
-							color: Theme.color_font_secondary
-							font.pixelSize: Theme.font_size_caption
-						}
+							Label {
+								width: parent.width
+								horizontalAlignment: Text.AlignHCenter
+								wrapMode: Text.WordWrap
+								text: root.statusDescription
+								color: Theme.color_font_secondary
+								font.pixelSize: Theme.font_size_caption
+							}
 
 						Row {
 							id: modeChips
