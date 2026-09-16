@@ -428,6 +428,11 @@ SwipeViewPage {
 
 									onClicked: {
 										if (root.isRunning) {
+									if (root.selectedModeKey !== "") {
+										root.lastModeKey = root.selectedModeKey
+									}
+									root.selectedModeKey = ""
+									root.dialEnabled = false
 											Global.dialogLayer.open(startStopDialogComponent, {
 												startRequested: false,
 											})
@@ -679,7 +684,7 @@ SwipeViewPage {
 							}
 							height: 52
 							text: root.actionLabel
-							enabled: startStop.valid && !root.isTransitioning && root.selectedModeKey !== ""
+							enabled: startStop.valid && !root.isTransitioning && (root.selectedModeKey !== "" || root.isRunning)
 							flat: false
 							backgroundColor: root.pendingStartStopAction === "start"
 								? Theme.color_darkBlue
