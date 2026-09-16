@@ -512,8 +512,8 @@ SwipeViewPage {
 									readonly property bool supported: modelData.modeValue >= 0
 									readonly property bool selectable: supported && (!roomSensorMode || root.hasRoomTemperatureControl)
 
-									height: 48
-									width: chipLabel.implicitWidth + 30
+									height: 66
+									width: Math.max(chipLabel.implicitWidth, 30) + 26
 
 									text: ""
 									flat: false
@@ -524,13 +524,27 @@ SwipeViewPage {
 
 									onClicked: root.requestModeChange(modelData.modeValue, modelData.label)
 
-									Label {
-										id: chipLabel
-
+									Column {
 										anchors.centerIn: parent
-										text: chipButton.modelData.label
-										color: Theme.color_white
-										font.pixelSize: Theme.font_size_body1
+										spacing: 3
+
+										CP.ColorImage {
+											anchors.horizontalCenter: parent.horizontalCenter
+											width: 22
+											height: 22
+											source: chipButton.modelData.icon
+											fillMode: Image.PreserveAspectFit
+											color: Theme.color_white
+										}
+
+										Label {
+											id: chipLabel
+
+											anchors.horizontalCenter: parent.horizontalCenter
+											text: chipButton.modelData.label
+											color: Theme.color_white
+											font.pixelSize: Theme.font_size_body1
+										}
 									}
 								}
 							}
