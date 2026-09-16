@@ -243,8 +243,10 @@ SwipeViewPage {
 			left: parent.left
 			right: parent.right
 		}
-		visible: root.hasHeater
-		height: 64
+		// Telemetry strip hidden for the HA thermostat card spike (was: root.hasHeater).
+		// Keep the block wired so it can be re-enabled with one line.
+		visible: false
+		height: visible ? 64 : 0
 
 		readonly property var cells: [
 			{
