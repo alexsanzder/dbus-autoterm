@@ -558,6 +558,7 @@ SwipeViewPage {
 								},
 								{
 									icon: root.heaterDisconnected ? root.alertIcon : "qrc:/images/icon_checkmark_32.svg",
+									valueBold: false,
 									label: qsTr("Status"),
 									value: root.heaterDisconnected ? qsTr("Disconnected") : ((errorCode.valid && errorCode.value !== 0) ? qsTr("Error") : qsTr("OK")),
 									valueColor: root.heaterDisconnected ? Qt.alpha(Theme.color_font_primary, 0.5) : Theme.color_font_primary,
