@@ -83,14 +83,33 @@ SwipeViewPage {
 		}
 		return "Select a heater mode to see more details here."
 	}
-	// Short status for the dial top: the active mode label only.
-	readonly property string activeModeLabel: {
-		for (let i = 0; i < modeCards.length; ++i) {
-			if (modeCards[i].key === activeModeCardKey) {
-				return modeCards[i].label
-			}
+	// Short live status for the dial top: compact form of /StateText.
+	readonly property string ringStatusLabel: {
+		if (!stateText.valid) {
+			return "Idle"
 		}
-		return ""
+		switch (stateText.value) {
+			case "not connected":
+				return "Not connected"
+			case "fault":
+				return "Fault"
+			case "starting":
+			case "starting ventilation":
+				return "Starting"
+			case "warming up":
+				return "Warming up"
+			case "shutting down":
+			case "stopping ventilation":
+				return "Shutting down"
+			case "running":
+				return showPowerControl || showTemperatureControl ? "Heating" : "Running"
+			case "ventilation":
+				return "Ventilating"
+			case "off":
+				return "Idle"
+			default:
+				return "Idle"
+		}
 	}
 	// Live status line: replaces the static description while the heater
 	// transitions or runs, showing real telemetry for the active mode.
@@ -409,7 +428,7 @@ SwipeViewPage {
 								primaryValue: root.ringPrimaryValue
 								secondaryValue: ""
 								captionValue: root.ringCurrentTempCaption
-								statusValue: root.activeModeLabel
+								statusValue: root.ringStatusLabel
 							}
 
 							// Steppers hug the ring's bottom opening, like the previous design
