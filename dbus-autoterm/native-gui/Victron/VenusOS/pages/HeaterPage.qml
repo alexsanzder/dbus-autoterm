@@ -26,6 +26,7 @@ SwipeViewPage {
 	readonly property url powerIcon: Qt.resolvedUrl("../images/icon_power.svg")
 	property bool dialEnabled: false
 	property string selectedModeKey: ""
+	property string lastModeKey: ""
 	readonly property bool hasHeater: !!currentHeater
 	readonly property bool isRunning: heaterState.valid && heaterState.value !== 0 && heaterState.value !== 10
 	readonly property bool isStarting: pendingStartStopAction === "start"
@@ -90,7 +91,7 @@ SwipeViewPage {
 	}
 	readonly property string selectedModeLabel: {
 		for (let i = 0; i < modeCards.length; ++i) {
-			if (modeCards[i].key === selectedModeKey) {
+			if (modeCards[i].key === (selectedModeKey !== "" ? selectedModeKey : lastModeKey)) {
 				return modeCards[i].label
 			}
 		}
@@ -432,6 +433,10 @@ SwipeViewPage {
 											})
 											return
 										}
+									if (root.selectedModeKey !== "") {
+										root.lastModeKey = root.selectedModeKey
+									}
+									root.selectedModeKey = ""
 										root.dialEnabled = false
 									}
 
@@ -471,6 +476,7 @@ SwipeViewPage {
 
 										onClicked: {
 											root.selectedModeKey = modelData.key
+												root.lastModeKey = modelData.key
 											root.dialEnabled = true
 											root.requestModeChange(modelData.modeValue, modelData.label)
 										}
