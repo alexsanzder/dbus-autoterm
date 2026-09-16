@@ -428,6 +428,7 @@ SwipeViewPage {
 										text: "\u2013"
 										enabled: root.canAdjustRingValue
 										font.pixelSize: Theme.font_size_h2 - 5
+										color: Theme.color_font_secondary
 										onClicked: root.adjustRingValue(-1)
 									}
 
@@ -450,6 +451,7 @@ SwipeViewPage {
 										text: "+"
 										enabled: root.canAdjustRingValue
 										font.pixelSize: Theme.font_size_h2 - 5
+										color: Theme.color_font_secondary
 										onClicked: root.adjustRingValue(1)
 									}
 
