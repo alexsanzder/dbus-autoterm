@@ -400,7 +400,7 @@ SwipeViewPage {
 
 							anchors {
 								top: dialArea.bottom
-								topMargin: 10
+								topMargin: 13
 								horizontalCenter: parent.horizontalCenter
 							}
 							width: modeBlockRow.width
@@ -625,7 +625,7 @@ SwipeViewPage {
 								left: parent.left
 								right: parent.right
 							}
-							height: 91
+							height: 94
 							radius: 8
 							color: "transparent"
 
@@ -672,7 +672,7 @@ SwipeViewPage {
 							}
 							height: 52
 							text: root.actionLabel
-							enabled: startStop.valid && !root.isTransitioning
+							enabled: startStop.valid && !root.isTransitioning && root.selectedModeKey !== ""
 							flat: false
 							backgroundColor: root.pendingStartStopAction === "start"
 								? Theme.color_darkBlue
