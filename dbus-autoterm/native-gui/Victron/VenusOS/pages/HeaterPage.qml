@@ -100,11 +100,17 @@ SwipeViewPage {
 				return "Warming up"
 			case "shutting down":
 			case "stopping ventilation":
-				return "Shutting down"
+				return "Cooling down"
 			case "running":
-				return showPowerControl || showTemperatureControl ? "Heating" : "Running"
+				if (showTemperatureControl && targetTemperature.valid) {
+					return "Heating to " + formatTemperatureValue(targetTemperature)
+				}
+				if (showPowerControl && powerLevel.valid) {
+					return "Heating at level " + powerLevel.value
+				}
+				return "Running"
 			case "ventilation":
-				return "Ventilating"
+				return "Only Ventilation"
 			case "off":
 				return "Idle"
 			default:
