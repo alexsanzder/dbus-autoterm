@@ -25,7 +25,7 @@ SwipeViewPage {
 	readonly property url infoIcon: Qt.resolvedUrl("../images/icon_info.svg")
 	readonly property url powerIcon: Qt.resolvedUrl("../images/icon_power.svg")
 	property bool dialEnabled: false
-	property bool powerSelected: true
+	property string selectedModeKey: "power"
 	readonly property bool hasHeater: !!currentHeater
 	readonly property bool isRunning: heaterState.valid && heaterState.value !== 0 && heaterState.value !== 10
 	readonly property bool isStarting: pendingStartStopAction === "start"
@@ -88,10 +88,18 @@ SwipeViewPage {
 		}
 		return "Select a heater mode to see more details here."
 	}
+	readonly property string selectedModeLabel: {
+		for (let i = 0; i < modeCards.length; ++i) {
+			if (modeCards[i].key === selectedModeKey) {
+				return modeCards[i].label
+			}
+		}
+		return "Power"
+	}
 	// Short live status for the dial top: compact form of /StateText.
 	readonly property string ringStatusLabel: {
 		if (!stateText.valid) {
-			return "Idle"
+			return "Idle " + selectedModeLabel
 		}
 		switch (stateText.value) {
 			case "not connected":
@@ -117,9 +125,9 @@ SwipeViewPage {
 			case "ventilation":
 				return "Only Ventilation"
 			case "off":
-				return "Idle"
+				return "Idle " + selectedModeLabel
 			default:
-				return "Idle"
+				return "Idle " + selectedModeLabel
 		}
 	}
 	// Live status line: replaces the static description while the heater
@@ -313,7 +321,7 @@ SwipeViewPage {
 
 							CircularHeaterRing {
 								id: ring
-								opacity: root.dialEnabled ? 1.0 : 0.35
+								opacity: root.dialEnabled ? 1.0 : 0.5
 
 								width: Math.min(dialArea.width * 0.9, dialArea.height, 280)
 								height: width
@@ -333,7 +341,7 @@ SwipeViewPage {
 
 							// Steppers hug the ring's bottom opening
 							Row {
-								opacity: root.dialEnabled ? 1.0 : 0.45
+								opacity: root.dialEnabled ? 1.0 : 0.5
 								anchors.top: ring.bottom
 								anchors.topMargin: -61
 								anchors.horizontalCenter: ring.horizontalCenter
@@ -412,13 +420,13 @@ SwipeViewPage {
 
 									text: ""
 									flat: false
-									backgroundColor: root.powerSelected ? Theme.color_blue : Theme.color_gray1
-									borderColor: root.powerSelected ? Theme.color_blue : Theme.color_gray1
+									backgroundColor: root.selectedModeKey === "power" ? Theme.color_blue : Theme.color_gray1
+									borderColor: root.selectedModeKey === "power" ? Theme.color_blue : Theme.color_gray1
 									color: Theme.color_white
 
 									onClicked: {
-										root.dialEnabled = !root.dialEnabled
-										root.powerSelected = root.dialEnabled
+										root.selectedModeKey = "power"
+										root.dialEnabled = false
 									}
 
 									CP.ColorImage {
@@ -439,7 +447,7 @@ SwipeViewPage {
 
 										required property var modelData
 
-										readonly property bool active: modelData.key === root.activeModeCardKey
+										readonly property bool active: modelData.key === root.selectedModeKey
 										readonly property bool roomSensorMode: modelData.modeValue === 1 || modelData.modeValue === 3
 										readonly property bool supported: modelData.modeValue >= 0
 										readonly property bool selectable: supported && (!roomSensorMode || root.hasRoomTemperatureControl)
@@ -454,7 +462,11 @@ SwipeViewPage {
 										borderColor: active ? Theme.color_blue : Theme.color_gray1
 										color: Theme.color_white
 
-										onClicked: root.requestModeChange(modelData.modeValue, modelData.label)
+										onClicked: {
+											root.selectedModeKey = modelData.key
+											root.dialEnabled = true
+											root.requestModeChange(modelData.modeValue, modelData.label)
+										}
 
 										CP.ColorImage {
 											anchors.centerIn: parent
