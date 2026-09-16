@@ -32,6 +32,11 @@ SwipeViewPage {
 	readonly property bool showPowerControl: mode.valid && (mode.value === 0 || mode.value === 2)
 	readonly property color panelStrokeColor: Theme.color_listItem_secondaryText
 	readonly property color ringProgressColor: themeBlueProbe.backgroundColor
+	// Home Assistant thermostat card palette: amber while heating, blue while
+	// ventilating, gray when idle.
+	readonly property color ringStateColor: !isRunning
+		? Theme.color_gray1
+		: (isVentilationMode ? Theme.color_blue : Qt.rgba(1.0, 0.58, 0.08, 1))
 	readonly property string actionLabel: isStarting
 		? "Starting..."
 		: (isStopping
@@ -113,6 +118,37 @@ SwipeViewPage {
 		}
 		return activeModeDescription
 	}
+	// Compact state caption shown inside the dial, Home Assistant style.
+	readonly property string ringCaption: {
+		if (!stateText.valid) {
+			return "Idle"
+		}
+		if (stateText.value === "not connected") {
+			return "Not connected"
+		}
+		if (stateText.value === "fault") {
+			return "Fault"
+		}
+		if (stateText.value === "starting" || stateText.value === "starting ventilation") {
+			return "Starting..."
+		}
+		if (stateText.value === "warming up") {
+			return "Warming up"
+		}
+		if (stateText.value === "shutting down" || stateText.value === "stopping ventilation") {
+			return "Cooling down"
+		}
+		if (stateText.value === "running") {
+			if (showPowerControl) {
+				return powerLevel.valid ? "Power level " + powerLevel.value : "Heating"
+			}
+			return targetTemperature.valid ? "Heating to " + formatTemperatureValue(targetTemperature) : "Heating"
+		}
+		if (stateText.value === "ventilation") {
+			return "Ventilating"
+		}
+		return "Idle"
+	}
 	readonly property var tabModel: {
 		const tabs = []
 		if (!heaterModel) {
@@ -133,12 +169,20 @@ SwipeViewPage {
 		}
 		return 1.0
 	}
-	readonly property string ringSecondaryValue: showPowerControl
-		? (powerLevel.valid ? powerLevel.value : "--")
-		: (showTemperatureControl ? formatTemperatureValue(targetTemperature) : "--")
 	readonly property bool canAdjustRingValue: showPowerControl
 		? powerLevel.valid
 		: (showTemperatureControl && targetTemperature.valid)
+	// Big center value: room temperature when a room source exists, otherwise
+	// the heater internal sensor, matching the telemetry strip fallback.
+	readonly property var displayTemperatureItem: roomTemperature.valid
+		? roomTemperature
+		: (internalTemperature.valid ? internalTemperature : heaterTemperature)
+	readonly property string targetValueLabel: showPowerControl
+		? (powerLevel.valid ? "Level " + powerLevel.value : "Level --")
+		: (targetTemperature.valid ? formatTemperatureValue(targetTemperature) : "--")
+	readonly property string targetValueCaption: showPowerControl
+		? "Power level"
+		: "Target temperature"
 
 	topLeftButton: VenusOS.StatusBar_LeftButton_ControlsInactive
 	fullScreenWhenIdle: true
@@ -311,7 +355,7 @@ SwipeViewPage {
 
 		anchors {
 			top: statusIndicatorHeader.bottom
-			topMargin: 16
+			topMargin: 12
 			left: parent.left
 			leftMargin: Theme.geometry_page_content_horizontalMargin
 			right: parent.right
@@ -346,95 +390,144 @@ SwipeViewPage {
 				width: heaterTab.width
 				height: heaterTab.height
 
+				// Home Assistant thermostat card layout: one centered column
+				// with the dial, target stepper, status, mode chips and the
+				// start/stop action.
 				Flickable {
-					id: leftPanel
+					id: cardScroll
 
-					width: Math.max(parent.width - dialArea.width + 12, 0)
-					anchors {
-						top: parent.top
-						left: parent.left
-						bottom: parent.bottom
-						right: dialArea.left
-						rightMargin: 12
-					}
+					anchors.fill: parent
 					contentWidth: width
-					contentHeight: leftContent.implicitHeight
+					contentHeight: cardColumn.implicitHeight
 					boundsBehavior: Flickable.StopAtBounds
 					clip: true
 
 					Column {
-						id: leftContent
+						id: cardColumn
 
-						width: leftPanel.width
-						spacing: 18
+						x: (parent.width - width) / 2
+						width: Math.min(parent.width, 560)
+						spacing: 14
+
+						Item {
+							id: dialArea
+
+							width: ring.width
+							height: ring.height
+							anchors.horizontalCenter: parent.horizontalCenter
+
+							CircularHeaterRing {
+								id: ring
+
+								width: Math.min(cardColumn.width * 0.58, 288)
+								height: width
+
+								valueRatio: root.ringValueRatio
+								progressColor: root.ringStateColor
+								primaryValue: root.formatTemperatureValue(root.displayTemperatureItem)
+								secondaryValue: ""
+								captionValue: root.ringCaption
+							}
+						}
 
 						Row {
-							width: parent.width - 12
-							spacing: 12
+							spacing: 24
+							anchors.horizontalCenter: parent.horizontalCenter
+
+							Button {
+								width: 60
+								height: 60
+								text: "\u2013"
+								enabled: root.canAdjustRingValue
+								font.pixelSize: Theme.font_size_h2
+								onClicked: root.adjustRingValue(-1)
+							}
+
+							Column {
+								spacing: 2
+								anchors.verticalCenter: parent.verticalCenter
+
+								Label {
+									anchors.horizontalCenter: parent.horizontalCenter
+									text: root.targetValueCaption
+									color: Theme.color_font_secondary
+									font.pixelSize: Theme.font_size_caption
+								}
+
+								Label {
+									anchors.horizontalCenter: parent.horizontalCenter
+									text: root.targetValueLabel
+									color: Theme.color_font_primary
+									font.bold: true
+									font.pixelSize: Theme.font_size_h2
+								}
+							}
+
+							Button {
+								width: 60
+								height: 60
+								text: "+"
+								enabled: root.canAdjustRingValue
+								font.pixelSize: Theme.font_size_h2
+								onClicked: root.adjustRingValue(1)
+							}
+						}
+
+						Label {
+							width: parent.width
+							horizontalAlignment: Text.AlignHCenter
+							wrapMode: Text.WordWrap
+							text: root.statusDescription
+							color: Theme.color_font_secondary
+							font.pixelSize: Theme.font_size_caption
+						}
+
+						Row {
+							id: modeChips
+
+							spacing: 10
 							anchors.horizontalCenter: parent.horizontalCenter
 
 							Repeater {
 								model: root.modeCards
 
-								delegate: Item {
+								Button {
+									id: chipButton
+
 									required property var modelData
 
 									readonly property bool active: modelData.key === root.activeModeCardKey
 									readonly property bool roomSensorMode: modelData.modeValue === 1 || modelData.modeValue === 3
 									readonly property bool supported: modelData.modeValue >= 0
 									readonly property bool selectable: supported && (!roomSensorMode || root.hasRoomTemperatureControl)
-									width: (parent.width - (4 * parent.spacing)) / 5
-									height: 92
 
-									Button {
-										anchors.fill: parent
-										text: ""
-										flat: false
-										enabled: selectable
-										backgroundColor: active ? Theme.color_blue : Theme.color_gray1
-										borderColor: active ? Theme.color_blue : Theme.color_gray1
+									height: 48
+									width: chipLabel.implicitWidth + 30
+
+									text: ""
+									flat: false
+									enabled: selectable
+									backgroundColor: active ? Theme.color_blue : Theme.color_gray1
+									borderColor: active ? Theme.color_blue : Theme.color_gray1
+									color: Theme.color_white
+
+									onClicked: root.requestModeChange(modelData.modeValue, modelData.label)
+
+									Label {
+										id: chipLabel
+
+										anchors.centerIn: parent
+										text: chipButton.modelData.label
 										color: Theme.color_white
-										onClicked: root.requestModeChange(modelData.modeValue, modelData.label)
-
-										Column {
-											anchors.centerIn: parent
-											width: parent.width - 12
-											spacing: 6
-
-											CP.ColorImage {
-												anchors.horizontalCenter: parent.horizontalCenter
-												width: 26
-												height: 26
-												source: modelData.icon
-												fillMode: Image.PreserveAspectFit
-												color: Theme.color_white
-											}
-
-											Label {
-												width: parent.width
-												horizontalAlignment: Text.AlignHCenter
-												wrapMode: Text.WordWrap
-												maximumLineCount: 2
-												text: modelData.label
-												color: Theme.color_white
-												font.pixelSize: Theme.font_size_caption
-											}
-										}
+										font.pixelSize: Theme.font_size_body1
 									}
 								}
 							}
 						}
 
-						Label {
-							width: parent.width
-							text: root.statusDescription
-							wrapMode: Text.WordWrap
-							color: Theme.color_font_secondary
-							font.pixelSize: Theme.font_size_caption
-						}
-
 						Button {
 							id: actionButton
+
 							width: parent.width
 							height: 56
 							text: root.actionLabel
@@ -456,58 +549,6 @@ SwipeViewPage {
 							onClicked: Global.dialogLayer.open(startStopDialogComponent, {
 								startRequested: !root.isRunning,
 							})
-						}
-					}
-				}
-
-				Item {
-					id: dialArea
-					width: Math.min(parent.width / 3, 216)
-					height: width + 108
-					anchors {
-						right: parent.right
-						// pin to the top, aligned with the mode tabs: the page bottom edge moves
-						// when the nav bar shows/hides (bottom: navBar.top in MainView), so any
-						// verticalCenter anchoring here would shift the dial on every bar toggle
-						top: parent.top
-						rightMargin: 0
-					}
-
-					CircularHeaterRing {
-						id: ring
-						width: parent.width
-						height: parent.width
-						anchors.top: parent.top
-						anchors.horizontalCenter: parent.horizontalCenter
-
-						valueRatio: root.ringValueRatio
-						progressColor: Theme.color_blue
-						primaryValue: root.formatTemperatureValue(roomTemperature)
-						secondaryValue: root.ringSecondaryValue
-					}
-
-					Row {
-						anchors.top: ring.bottom
-						anchors.topMargin: -48
-						anchors.horizontalCenter: ring.horizontalCenter
-						spacing: 12
-
-						Button {
-							width: 56
-							height: 56
-							text: "–"
-							enabled: root.canAdjustRingValue
-							font.pixelSize: Theme.font_size_h2
-							onClicked: root.adjustRingValue(-1)
-						}
-
-						Button {
-							width: 56
-							height: 56
-							text: "+"
-							enabled: root.canAdjustRingValue
-							font.pixelSize: Theme.font_size_h2
-							onClicked: root.adjustRingValue(1)
 						}
 					}
 				}

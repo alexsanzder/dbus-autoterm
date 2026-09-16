@@ -12,8 +12,12 @@ Item {
 	property color centerStrokeColor: Qt.rgba(1, 1, 1, 0.06)
 	property color primaryValueColor: Theme.color_font_primary
 	property color secondaryValueColor: Theme.color_listItem_secondaryText
+	property color captionValueColor: Theme.color_listItem_secondaryText
 	property string primaryValue: ""
 	property string secondaryValue: ""
+	property string captionValue: ""
+	property real primaryValueFontScale: 1.8
+	property real secondaryValueFontScale: 1.2
 
 	readonly property real normalizedRatio: clamp(valueRatio, 0.0, 1.0)
 	readonly property real startAngle: 225
@@ -53,22 +57,32 @@ Item {
 
 			Column {
 				anchors.centerIn: parent
-				spacing: 0
+				spacing: 4
 
 				Label {
 					anchors.horizontalCenter: parent.horizontalCenter
 					text: root.primaryValue
-					font.pixelSize: Theme.font_size_h1 * 1.35
+					font.pixelSize: Theme.font_size_h1 * root.primaryValueFontScale
 					font.bold: true
 					color: root.primaryValueColor
 				}
 
 				Label {
 					anchors.horizontalCenter: parent.horizontalCenter
+					visible: text !== ""
 					text: root.secondaryValue
-					font.pixelSize: Theme.font_size_body1 * 1.2
+					font.pixelSize: Theme.font_size_body1 * root.secondaryValueFontScale
 					font.bold: true
 					color: root.secondaryValueColor
+				}
+
+				// HA thermostat style state caption under the big value
+				Label {
+					anchors.horizontalCenter: parent.horizontalCenter
+					visible: text !== ""
+					text: root.captionValue
+					font.pixelSize: Theme.font_size_caption
+					color: root.captionValueColor
 				}
 			}
 		}
