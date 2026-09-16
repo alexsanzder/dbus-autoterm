@@ -246,8 +246,8 @@ SwipeViewPage {
 		id: contentScope
 
 		anchors {
-			top: tabBar.visible ? tabBar.bottom : parent.top
-			topMargin: 12
+			top: parent.top
+			topMargin: 4
 			left: parent.left
 			leftMargin: Theme.geometry_page_content_horizontalMargin
 			right: parent.right
@@ -570,9 +570,9 @@ SwipeViewPage {
 								left: parent.left
 								right: parent.right
 							}
-							height: 128
+							height: 96
 							radius: 8
-							color: Theme.color_gray1
+							color: "transparent"
 
 
 							Label {
