@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls.impl as CP
 import Victron.VenusOS
 
 Item {
@@ -87,12 +88,27 @@ Item {
 				}
 
 				// HA thermostat style state caption under the big value
-				Label {
+				// Current temperature with a thermometer icon at its left
+				Row {
 					anchors.horizontalCenter: parent.horizontalCenter
-					visible: text !== ""
-					text: root.captionValue
-					font.pixelSize: Theme.font_size_body1 * 1.4
-					color: root.captionValueColor
+					spacing: 6
+					visible: root.captionValue !== ""
+
+					CP.ColorImage {
+						anchors.verticalCenter: parent.verticalCenter
+						width: 20
+						height: 20
+						source: "qrc:/images/icon_temp_32.svg"
+						fillMode: Image.PreserveAspectFit
+						color: root.captionValueColor
+					}
+
+					Label {
+						anchors.verticalCenter: parent.verticalCenter
+						text: root.captionValue
+						font.pixelSize: Theme.font_size_body1 * 1.4
+						color: root.captionValueColor
+					}
 				}
 			}
 		}
