@@ -25,7 +25,7 @@ SwipeViewPage {
 	readonly property url infoIcon: Qt.resolvedUrl("../images/icon_info.svg")
 	readonly property url powerIcon: Qt.resolvedUrl("../images/icon_power.svg")
 	property bool dialEnabled: false
-	property string selectedModeKey: "power"
+	property string selectedModeKey: ""
 	readonly property bool hasHeater: !!currentHeater
 	readonly property bool isRunning: heaterState.valid && heaterState.value !== 0 && heaterState.value !== 10
 	readonly property bool isStarting: pendingStartStopAction === "start"
@@ -414,18 +414,25 @@ SwipeViewPage {
 
 								Button {
 									id: powerChipButton
+									opacity: root.selectedModeKey === "" ? 0.5 : 1.0
 
 									height: 50
 									width: 50
 
 									text: ""
 									flat: false
-									backgroundColor: root.selectedModeKey === "power" ? Theme.color_blue : Theme.color_gray1
-									borderColor: root.selectedModeKey === "power" ? Theme.color_blue : Theme.color_gray1
+									backgroundColor: root.selectedModeKey === "" ? Theme.color_blue : Theme.color_gray1
+									borderColor: root.selectedModeKey === "" ? Theme.color_blue : Theme.color_gray1
 									color: Theme.color_white
 
 									onClicked: {
-										root.selectedModeKey = "power"
+										if (root.isRunning) {
+											Global.dialogLayer.open(startStopDialogComponent, {
+												startRequested: false,
+											})
+											return
+										}
+										root.selectedModeKey = ""
 										root.dialEnabled = false
 									}
 
