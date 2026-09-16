@@ -601,7 +601,7 @@ SwipeViewPage {
 									maximumLineCount: 2
 									elide: Text.ElideRight
 									verticalAlignment: Text.AlignBottom
-									color: Theme.color_font_primary
+									color: Theme.color_font_secondary
 									font.pixelSize: Theme.font_size_body1
 								}
 							}
