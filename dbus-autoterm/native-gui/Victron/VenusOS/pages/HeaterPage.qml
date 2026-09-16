@@ -21,6 +21,7 @@ SwipeViewPage {
 	readonly property var currentHeater: heaterModel ? heaterModel.deviceAt(currentHeaterIndex) : null
 	readonly property string bindPrefix: currentHeater ? currentHeater.serviceUid : ""
 	readonly property url heaterIcon: Qt.resolvedUrl("../images/heater_bottom_bar.svg")
+	readonly property url flameIcon: Qt.resolvedUrl("../images/icon_flame.svg")
 	readonly property bool hasHeater: !!currentHeater
 	readonly property bool isRunning: heaterState.valid && heaterState.value !== 0 && heaterState.value !== 10
 	readonly property bool isStarting: pendingStartStopAction === "start"
@@ -70,7 +71,7 @@ SwipeViewPage {
 	}
 	readonly property var modeCards: [
 		{ key: "temperature", modeValue: 1, label: "Temperature", icon: "qrc:/images/icon_temp_32.svg", description: "Maintain a target room temperature." },
-		{ key: "power", modeValue: 0, label: "Power", icon: root.heaterIcon, description: "Run the heater at a fixed power level." },
+		{ key: "power", modeValue: 0, label: "Power", icon: root.flameIcon, description: "Run the heater at a fixed power level." },
 		{ key: "heat-ventilation", modeValue: 3, label: "Heat & Vent", icon: root.heaterIcon, description: "Blend heating with ventilation support." },
 		{ key: "thermostat", modeValue: -1, label: "Thermostat", icon: "qrc:/images/icon_temp_coolant_32.svg", description: "Thermostat control placeholder for the custom GUI." },
 		{ key: "ventilation", modeValue: 2, label: "Ventilation", icon: "qrc:/images/icon_propeller.svg", description: "Circulate air without active heating." },

@@ -14,6 +14,7 @@ PATCHED_FILES=(
 
 ADDED_FILES=(
     "images/heater_bottom_bar.svg"
+    "images/icon_flame.svg"
     "pages/HeaterPage.qml"
 )
 
