@@ -35,7 +35,7 @@ SwipeViewPage {
 	// Home Assistant thermostat card palette: amber while heating, blue while
 	// ventilating, gray when idle.
 	readonly property color ringStateColor: !isRunning
-		? Theme.color_gray1
+		? Qt.rgba(0.62, 0.36, 0.05, 1)  // dark amber while stopped
 		: (isVentilationMode ? Theme.color_blue : Qt.rgba(1.0, 0.58, 0.08, 1))
 	readonly property string actionLabel: isStarting
 		? "Starting..."
@@ -102,11 +102,11 @@ SwipeViewPage {
 			case "stopping ventilation":
 				return "Cooling down"
 			case "running":
-				if (showTemperatureControl && targetTemperature.valid) {
-					return "Heating to " + formatTemperatureValue(targetTemperature)
+				if (showTemperatureControl) {
+					return "Heating"
 				}
-				if (showPowerControl && powerLevel.valid) {
-					return "Heating at level " + powerLevel.value
+				if (showPowerControl) {
+					return "Heating level"
 				}
 				return "Running"
 			case "ventilation":
