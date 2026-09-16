@@ -451,23 +451,9 @@ SwipeViewPage {
 								right: parent.right
 							}
 							visible: root.hasHeater
-							height: visible ? 248 : 0
+							height: visible ? 184 : 0
 
 							readonly property var cells: [
-								{
-									icon: "qrc:/images/icon_checkmark_32.svg",
-									label: qsTr("Connection"),
-									value: (communicationAlarm.valid && communicationAlarm.value !== 0) ? qsTr("Alarm") : qsTr("Connected"),
-									valueColor: (communicationAlarm.valid && communicationAlarm.value !== 0) ? Theme.color_red : Theme.color_green,
-									iconColor: (communicationAlarm.valid && communicationAlarm.value !== 0) ? Theme.color_red : Theme.color_green
-								},
-								{
-									icon: "qrc:/images/icon_battery_24.svg",
-									label: qsTr("Battery"),
-									value: batteryVoltage.valid ? batteryVoltage.value.toFixed(1) + " V" : "--",
-									valueColor: Theme.color_font_primary,
-									iconColor: Theme.color_font_secondary
-								},
 								{
 									icon: "qrc:/images/icon_propeller.svg",
 									iconSize: 20,
@@ -579,14 +565,14 @@ SwipeViewPage {
 							id: statusCard
 
 							anchors {
-								top: statusIndicatorHeader.bottom
-						topMargin: 12
+								bottom: actionButton.top
+								bottomMargin: 5
 								left: parent.left
 								right: parent.right
 							}
 							height: 128
 							radius: 8
-							color: Qt.rgba(1, 1, 1, 0.05)
+							color: Theme.color_gray1
 
 
 							Label {
