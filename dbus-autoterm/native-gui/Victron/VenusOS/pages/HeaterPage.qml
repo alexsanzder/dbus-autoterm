@@ -118,6 +118,15 @@ SwipeViewPage {
 				return "Idle"
 		}
 	}
+	// Label of the active mode, shown under the mode chips.
+	readonly property string activeModeLabel: {
+		for (let i = 0; i < modeCards.length; ++i) {
+			if (modeCards[i].key === activeModeCardKey) {
+				return modeCards[i].label
+			}
+		}
+		return ""
+	}
 	// Live status line: replaces the static description while the heater
 	// transitions or runs, showing real telemetry for the active mode.
 	readonly property string statusDescription: {
@@ -249,9 +258,8 @@ SwipeViewPage {
 			left: parent.left
 			right: parent.right
 		}
-		// Telemetry strip hidden for the HA thermostat card spike (was: root.hasHeater).
-		// Keep the block wired so it can be re-enabled with one line.
-		visible: false
+		// Telemetry strip spans the top of the fixed two-column card.
+		visible: root.hasHeater
 		height: visible ? 64 : 0
 
 		readonly property var cells: [
@@ -398,37 +406,38 @@ SwipeViewPage {
 				width: heaterTab.width
 				height: heaterTab.height
 
-				// Home Assistant thermostat card layout: one centered column
-				// with the dial, target stepper, status, mode chips and the
-				// start/stop action.
-				Flickable {
-					id: cardScroll
+				// Fixed two-column card for 7" displays: dial + start/stop on the left,
+				// status details + mode selection on the right. No scrolling.
+				Row {
+					id: cardRow
 
 					anchors.fill: parent
-					contentWidth: width
-					contentHeight: cardColumn.implicitHeight
-					boundsBehavior: Flickable.StopAtBounds
-					clip: true
+					spacing: 24
 
-					Column {
-						id: cardColumn
+					// LEFT column
+					Item {
+						id: leftColumn
 
-						x: (parent.width - width) / 2
-						width: Math.min(parent.width, 560)
-						spacing: 14
+						width: Math.round(parent.width * 0.52)
+						height: parent.height
 
 						Item {
 							id: dialArea
 
-							width: ring.width
-							height: ring.height + 12
-							anchors.horizontalCenter: parent.horizontalCenter
+							anchors {
+								top: parent.top
+								left: parent.left
+								right: parent.right
+								bottom: actionButton.top
+								bottomMargin: 12
+							}
 
 							CircularHeaterRing {
 								id: ring
 
-								width: Math.min(cardColumn.width * 0.58, 288)
+								width: Math.min(dialArea.width * 0.9, dialArea.height, 340)
 								height: width
+								anchors.centerIn: parent
 
 								valueRatio: root.ringValueRatio
 								progressColor: root.ringStateColor
@@ -438,7 +447,7 @@ SwipeViewPage {
 								statusValue: root.ringStatusLabel
 							}
 
-							// Steppers hug the ring's bottom opening, like the previous design
+							// Steppers hug the ring's bottom opening
 							Row {
 								anchors.top: ring.bottom
 								anchors.topMargin: -56
@@ -491,66 +500,17 @@ SwipeViewPage {
 									}
 								}
 							}
-
-						}
-
-						Row {
-							id: modeChips
-
-							spacing: 10
-							anchors.horizontalCenter: parent.horizontalCenter
-
-							Repeater {
-								model: root.modeCards
-
-								Button {
-									id: chipButton
-
-									required property var modelData
-
-									readonly property bool active: modelData.key === root.activeModeCardKey
-									readonly property bool roomSensorMode: modelData.modeValue === 1 || modelData.modeValue === 3
-									readonly property bool supported: modelData.modeValue >= 0
-									readonly property bool selectable: supported && (!roomSensorMode || root.hasRoomTemperatureControl)
-
-									height: 58
-									width: 58
-
-									text: ""
-									flat: false
-									enabled: selectable
-									backgroundColor: active ? Theme.color_blue : Theme.color_gray1
-									borderColor: active ? Theme.color_blue : Theme.color_gray1
-									color: Theme.color_white
-
-									onClicked: root.requestModeChange(modelData.modeValue, modelData.label)
-
-									CP.ColorImage {
-										anchors.centerIn: parent
-										width: 26
-										height: 26
-										source: chipButton.modelData.icon
-										fillMode: Image.PreserveAspectFit
-										color: Theme.color_white
-									}
-								}
-							}
-						}
-
-						Label {
-							width: parent.width
-							horizontalAlignment: Text.AlignHCenter
-							wrapMode: Text.WordWrap
-							text: root.statusDescription
-							color: Theme.color_font_secondary
-							font.pixelSize: Theme.font_size_caption
 						}
 
 						Button {
 							id: actionButton
 
-							width: parent.width
-							height: 56
+							anchors {
+								left: parent.left
+								right: parent.right
+								bottom: parent.bottom
+							}
+							height: 64
 							text: root.actionLabel
 							enabled: startStop.valid && !root.isTransitioning
 							flat: false
@@ -570,6 +530,101 @@ SwipeViewPage {
 							onClicked: Global.dialogLayer.open(startStopDialogComponent, {
 								startRequested: !root.isRunning,
 							})
+						}
+					}
+
+					// RIGHT column
+					Item {
+						id: rightColumn
+
+						width: parent.width - leftColumn.width - cardRow.spacing
+						height: parent.height
+
+						Rectangle {
+							id: statusCard
+
+							anchors {
+								top: parent.top
+								left: parent.left
+								right: parent.right
+							}
+							height: 128
+							radius: 8
+							color: Qt.rgba(1, 1, 1, 0.05)
+							border.width: 1
+							border.color: root.panelStrokeColor
+
+							Label {
+								anchors {
+									fill: parent
+									margins: 12
+								}
+								text: root.statusDescription
+								wrapMode: Text.WordWrap
+								maximumLineCount: 4
+								elide: Text.ElideRight
+								verticalAlignment: Text.AlignVCenter
+								color: Theme.color_font_primary
+								font.pixelSize: Theme.font_size_body1
+							}
+						}
+
+						Column {
+							id: modeBlock
+
+							anchors {
+								bottom: parent.bottom
+								horizontalCenter: parent.horizontalCenter
+							}
+							spacing: 10
+
+							Label {
+								anchors.horizontalCenter: parent.horizontalCenter
+								text: root.activeModeLabel
+								color: Theme.color_font_secondary
+								font.pixelSize: Theme.font_size_body1
+							}
+
+							Row {
+								spacing: 12
+								anchors.horizontalCenter: parent.horizontalCenter
+
+								Repeater {
+									model: root.modeCards
+
+									Button {
+										id: chipButton
+
+										required property var modelData
+
+										readonly property bool active: modelData.key === root.activeModeCardKey
+										readonly property bool roomSensorMode: modelData.modeValue === 1 || modelData.modeValue === 3
+										readonly property bool supported: modelData.modeValue >= 0
+										readonly property bool selectable: supported && (!roomSensorMode || root.hasRoomTemperatureControl)
+
+										height: 58
+										width: 58
+
+										text: ""
+										flat: false
+										enabled: selectable
+										backgroundColor: active ? Theme.color_blue : Theme.color_gray1
+										borderColor: active ? Theme.color_blue : Theme.color_gray1
+										color: Theme.color_white
+
+										onClicked: root.requestModeChange(modelData.modeValue, modelData.label)
+
+										CP.ColorImage {
+											anchors.centerIn: parent
+											width: 26
+											height: 26
+											source: chipButton.modelData.icon
+											fillMode: Image.PreserveAspectFit
+											color: Theme.color_white
+										}
+									}
+								}
+							}
 						}
 					}
 				}
