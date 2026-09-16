@@ -304,9 +304,8 @@ SwipeViewPage {
 								top: parent.top
 								left: parent.left
 								right: parent.right
-								bottom: modeBlock.top
-								bottomMargin: 20
 							}
+							height: 340
 
 							CircularHeaterRing {
 								id: ring
@@ -386,7 +385,8 @@ SwipeViewPage {
 							id: modeBlock
 
 							anchors {
-								bottom: parent.bottom
+								top: dialArea.bottom
+								topMargin: 12
 								horizontalCenter: parent.horizontalCenter
 							}
 							spacing: 10
@@ -408,8 +408,8 @@ SwipeViewPage {
 										readonly property bool supported: modelData.modeValue >= 0
 										readonly property bool selectable: supported && (!roomSensorMode || root.hasRoomTemperatureControl)
 
-										height: 58
-										width: 58
+											height: 50
+											width: 50
 
 										text: ""
 										flat: false
@@ -422,8 +422,8 @@ SwipeViewPage {
 
 										CP.ColorImage {
 											anchors.centerIn: parent
-											width: 26
-											height: 26
+													width: 22
+													height: 22
 											source: chipButton.modelData.icon
 											fillMode: Image.PreserveAspectFit
 											color: Theme.color_white
@@ -565,8 +565,8 @@ SwipeViewPage {
 							id: statusCard
 
 							anchors {
-								bottom: actionButton.top
-								bottomMargin: 5
+								top: statusIndicatorHeader.bottom
+								topMargin: 8
 								left: parent.left
 								right: parent.right
 							}
@@ -596,9 +596,10 @@ SwipeViewPage {
 							anchors {
 								left: parent.left
 								right: parent.right
-								bottom: parent.bottom
+								top: statusCard.bottom
+								topMargin: 5
 							}
-							height: 64
+							height: 52
 							text: root.actionLabel
 							enabled: startStop.valid && !root.isTransitioning
 							flat: false
