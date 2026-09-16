@@ -432,7 +432,6 @@ SwipeViewPage {
 											})
 											return
 										}
-										root.selectedModeKey = ""
 										root.dialEnabled = false
 									}
 
