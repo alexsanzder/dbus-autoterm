@@ -73,7 +73,7 @@ Item {
 					anchors.horizontalCenter: parent.horizontalCenter
 					text: root.primaryValue
 					font.pixelSize: Theme.font_size_h1 * root.primaryValueFontScale
-					font.bold: true
+					font.weight: Font.DemiBold
 					color: root.primaryValueColor
 				}
 
@@ -91,7 +91,7 @@ Item {
 					anchors.horizontalCenter: parent.horizontalCenter
 					visible: text !== ""
 					text: root.captionValue
-					font.pixelSize: Theme.font_size_body1 * 1.2
+					font.pixelSize: Theme.font_size_body1 * 1.4
 					color: root.captionValueColor
 				}
 			}
