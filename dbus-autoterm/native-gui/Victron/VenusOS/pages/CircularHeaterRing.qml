@@ -15,8 +15,10 @@ Item {
 	property color secondaryValueColor: Theme.color_listItem_secondaryText
 	property color captionValueColor: Theme.color_listItem_secondaryText
 	property string primaryValue: ""
+	property string primaryUnit: ""
 	property string secondaryValue: ""
 	property string captionValue: ""
+	property string captionUnit: ""
 	property string statusValue: ""
 	property real primaryValueFontScale: 1.8
 	property real secondaryValueFontScale: 1.2
@@ -70,12 +72,36 @@ Item {
 					color: root.captionValueColor
 				}
 
-				Label {
+				// Big center value: number with optional superscript unit (same style as captionValue/captionUnit)
+				Item {
+					id: primaryValueContainer
 					anchors.horizontalCenter: parent.horizontalCenter
-					text: root.primaryValue
-					font.pixelSize: Theme.font_size_h1 * root.primaryValueFontScale
-					font.weight: Font.DemiBold
-					color: root.primaryValueColor
+					width: primaryNumber.paintedWidth + (root.primaryUnit !== "" ? primaryUnitItem.paintedWidth + 3 : 0)
+					height: Math.max(primaryNumber.paintedHeight, root.primaryUnit !== "" ? primaryUnitItem.paintedHeight : 0)
+					visible: root.primaryValue !== ""
+
+					Label {
+						id: primaryNumber
+						anchors.verticalCenter: parent.verticalCenter
+						text: root.primaryValue
+						font.pixelSize: Theme.font_size_h1 * root.primaryValueFontScale
+						font.weight: Font.DemiBold
+						color: root.primaryValueColor
+					}
+
+					Label {
+						id: primaryUnitItem
+						anchors {
+							left: primaryNumber.right
+							leftMargin: 3
+							top: primaryNumber.top
+							topMargin: 8
+						}
+						visible: root.primaryUnit !== ""
+						text: root.primaryUnit
+						font.pixelSize: Theme.font_size_body2
+						color: root.primaryValueColor
+					}
 				}
 
 				Label {
@@ -103,11 +129,32 @@ Item {
 						color: root.captionValueColor
 					}
 
-					Label {
-						anchors.verticalCenter: parent.verticalCenter
-						text: root.captionValue
-						font.pixelSize: Theme.font_size_body1 * 1.4
-						color: root.captionValueColor
+					// Number with the unit superscripted (e.g. 21°C)
+					Item {
+						width: captionNumber.paintedWidth + captionUnit.paintedWidth + 3
+						height: Math.max(captionNumber.paintedHeight, captionUnit.paintedHeight)
+
+						Label {
+							id: captionNumber
+							anchors.verticalCenter: parent.verticalCenter
+							text: root.captionValue
+							font.pixelSize: Theme.font_size_body1 * 1.4
+							color: root.captionValueColor
+						}
+
+						// Superscript unit: smaller font raised to sit at the value's cap height.
+						Label {
+							id: captionUnit
+							anchors {
+								left: captionNumber.right
+								leftMargin: 1
+								top: captionNumber.top
+								topMargin: 2
+							}
+							text: root.captionUnit
+							font.pixelSize: Theme.font_size_caption
+							color: root.captionValueColor
+						}
 					}
 				}
 			}

@@ -174,8 +174,29 @@ SwipeViewPage {
 		}
 		return activeModeDescription
 	}
-	// Compact caption inside the dial: the current temperature.
-	readonly property string ringCurrentTempCaption: formatTemperatureValue(displayTemperatureItem)
+	function clamp(value, minValue, maxValue) {
+		return Math.max(minValue, Math.min(maxValue, value))
+	}
+
+	function formatTemperatureNumber(item) {
+		if (!item.valid || item.value === undefined || item.value === null || item.value === "") {
+			return "--"
+		}
+		return String(Number(Units.convert(item.value, VenusOS.Units_Temperature_Celsius, Global.systemSettings.temperatureUnit)).toFixed(0))
+	}
+
+	function formatTemperatureValue(item) {
+		if (!item.valid || item.value === undefined || item.value === null || item.value === "") {
+			return "--"
+		}
+		return Number(Units.convert(item.value, VenusOS.Units_Temperature_Celsius, Global.systemSettings.temperatureUnit)).toFixed(0)
+			+ Global.systemSettings.temperatureUnitSuffix
+	}
+
+	// Compact caption inside the dial: the current temperature shown as a number
+	// with its unit superscripted separately.
+	readonly property string ringCurrentTempValue: formatTemperatureNumber(displayTemperatureItem)
+	readonly property string ringCurrentTempUnit: ringCurrentTempValue === "--" ? "" : Global.systemSettings.temperatureUnitSuffix
 
 	readonly property var tabModel: {
 		const tabs = []
@@ -207,9 +228,23 @@ SwipeViewPage {
 		: (internalTemperature.valid ? internalTemperature : heaterTemperature)
 	// Big center value: the value the ring steppers set — target temperature
 	// in temperature modes, power level in power/ventilation modes.
-	readonly property string ringPrimaryValue: showPowerControl
-		? (powerLevel.valid ? powerLevel.value : "--")
-		: (targetTemperature.valid ? formatTemperatureValue(targetTemperature) : "--")
+	// Temperature uses the same superscript unit style as the caption (number +
+	// raised °C/°F); power level has no unit.
+	readonly property string ringPrimaryNumber: {
+		if (showPowerControl) {
+			return powerLevel.valid ? String(powerLevel.value) : "--"
+		}
+		if (targetTemperature.valid) {
+			return formatTemperatureNumber(targetTemperature)
+		}
+		return "--"
+	}
+	readonly property string ringPrimaryUnit: {
+		if (showPowerControl) {
+			return ""
+		}
+		return ringPrimaryNumber !== "--" && targetTemperature.valid ? Global.systemSettings.temperatureUnitSuffix : ""
+	}
 
 	topLeftButton: VenusOS.StatusBar_LeftButton_ControlsInactive
 	fullScreenWhenIdle: true
@@ -342,9 +377,11 @@ SwipeViewPage {
 
 								valueRatio: root.ringValueRatio
 								progressColor: root.ringStateColor
-								primaryValue: root.ringPrimaryValue
+								primaryValue: root.ringPrimaryNumber
+								primaryUnit: root.ringPrimaryUnit
 								secondaryValue: ""
-								captionValue: root.ringCurrentTempCaption
+								captionValue: root.ringCurrentTempValue
+								captionUnit: root.ringCurrentTempUnit
 								statusValue: root.ringStatusLabel
 							}
 
@@ -434,20 +471,20 @@ SwipeViewPage {
 
 									onClicked: {
 										if (root.isRunning) {
-									if (root.selectedModeKey !== "") {
-										root.lastModeKey = root.selectedModeKey
-									}
-									root.selectedModeKey = ""
-									root.dialEnabled = false
+											if (root.selectedModeKey !== "") {
+												root.lastModeKey = root.selectedModeKey
+											}
+											root.selectedModeKey = ""
+											root.dialEnabled = false
 											Global.dialogLayer.open(startStopDialogComponent, {
 												startRequested: false,
 											})
 											return
 										}
-									if (root.selectedModeKey !== "") {
-										root.lastModeKey = root.selectedModeKey
-									}
-									root.selectedModeKey = ""
+										if (root.selectedModeKey !== "") {
+											root.lastModeKey = root.selectedModeKey
+										}
+										root.selectedModeKey = ""
 										root.dialEnabled = false
 									}
 
@@ -474,8 +511,8 @@ SwipeViewPage {
 										readonly property bool supported: modelData.modeValue >= 0
 										readonly property bool selectable: supported
 
-											height: 50
-											width: 50
+										height: 50
+										width: 50
 
 										text: ""
 										flat: false
@@ -486,15 +523,15 @@ SwipeViewPage {
 
 										onClicked: {
 											root.selectedModeKey = modelData.key
-												root.lastModeKey = modelData.key
+											root.lastModeKey = modelData.key
 											root.dialEnabled = true
 											root.requestModeChange(modelData.modeValue, modelData.label)
 										}
 
 										CP.ColorImage {
 											anchors.centerIn: parent
-													width: 22
-													height: 22
+											width: 22
+											height: 22
 											source: chipButton.modelData.icon
 											fillMode: Image.PreserveAspectFit
 											color: Theme.color_white
@@ -782,18 +819,6 @@ SwipeViewPage {
 				}
 			}
 		}
-	}
-
-	function clamp(value, minValue, maxValue) {
-		return Math.max(minValue, Math.min(maxValue, value))
-	}
-
-	function formatTemperatureValue(item) {
-		if (!item.valid || item.value === undefined || item.value === null || item.value === "") {
-			return "--"
-		}
-		return Number(Units.convert(item.value, VenusOS.Units_Temperature_Celsius, Global.systemSettings.temperatureUnit)).toFixed(0)
-			+ Global.systemSettings.temperatureUnitSuffix
 	}
 
 	function adjustRingValue(delta) {
