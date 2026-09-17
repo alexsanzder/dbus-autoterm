@@ -19,6 +19,7 @@ SwipeViewPage {
 	property bool dialEnabled: false
 	property string selectedModeKey: ""
 	property string lastModeKey: ""
+	property int rightTabIndex: 1
 
 	readonly property int heaterCount: heaterModel ? heaterModel.count : 0
 	readonly property var currentHeater: heaterModel ? heaterModel.deviceAt(currentHeaterIndex) : null
@@ -663,201 +664,287 @@ SwipeViewPage {
 						width: parent.width - leftColumn.width - cardRow.spacing
 						height: parent.height
 
-						// Telemetry grid: 2-column status card, each item in its own cell.
+						// Segmented tab navigation: Timer | Status (Telemetry)
 						Item {
-							id: statusIndicatorHeader
+							id: rightTabBar
 
 							anchors {
 								top: parent.top
 								left: parent.left
 								right: parent.right
 							}
-							visible: root.hasHeater
-							height: visible ? 184 : 0
+							height: 40
 
-							readonly property var cells: [
-								{
-									icon: "qrc:/images/icon_propeller.svg",
-									iconSize: 20,
-									label: qsTr("Fan"),
-									value: root.heaterDisconnected ? "--"
-										: (fanRpmActual.valid ? fanRpmActual.value + " " + qsTr("RPM") : "--"),
-									valueColor: root.heaterDisconnected
-										? Qt.alpha(Theme.color_font_primary, 0.5)
-										: Theme.color_font_primary,
-									iconColor: root.heaterDisconnected
-										? Qt.alpha(Theme.color_font_secondary, 0.5)
-										: Theme.color_font_secondary
-								},
-								{
-									icon: "qrc:/images/icon_engine_temp_32.svg",
-									label: qsTr("Heater temp."),
-									value: root.heaterDisconnected ? "--"
-										: (heaterTemperature.valid ? heaterTemperature.value + "°C" : "--"),
-									valueColor: root.heaterDisconnected
-										? Qt.alpha(Theme.color_font_primary, 0.5)
-										: Theme.color_font_primary,
-									iconColor: root.heaterDisconnected
-										? Qt.alpha(Theme.color_font_secondary, 0.5)
-										: Theme.color_font_secondary
-								},
-								{
-									icon: "qrc:/images/icon_temp_32.svg",
-									label: qsTr("Room temp."),
-									value: roomTemperature.valid
-										? root.formatTemperatureValue(roomTemperature)
-										: (internalTemperature.valid ? internalTemperature.value + "°C" : "--"),
-									valueColor: Theme.color_font_primary,
-									iconColor: Theme.color_font_secondary
-								},
-								{
-									icon: "qrc:/images/icon_temp_32.svg",
-									label: qsTr("Internal temp."),
-									value: root.heaterDisconnected ? "--"
-										: (internalTemperature.valid ? internalTemperature.value + "°C" : "--"),
-									valueColor: root.heaterDisconnected
-										? Qt.alpha(Theme.color_font_primary, 0.5)
-										: Theme.color_font_primary,
-									iconColor: root.heaterDisconnected
-										? Qt.alpha(Theme.color_font_secondary, 0.5)
-										: Theme.color_font_secondary
-								},
-								{
-									icon: root.heaterDisconnected ? root.alertIcon : "qrc:/images/icon_checkmark_32.svg",
-									valueBold: false,
-									label: qsTr("Status"),
-									value: root.heaterDisconnected ? qsTr("Disconnected")
-										: ((errorCode.valid && errorCode.value !== 0) ? qsTr("Error") : qsTr("OK")),
-									valueColor: root.heaterDisconnected
-										? Qt.alpha(Theme.color_font_primary, 0.5)
-										: Theme.color_font_primary,
-									iconColor: root.heaterDisconnected ? Theme.color_red : Theme.color_green
-								},
-								{
-									icon: root.pumpIcon,
-									label: qsTr("Fuel pump freq."),
-									value: root.heaterDisconnected ? "--"
-										: (fuelPumpFrequency.valid ? fuelPumpFrequency.value.toFixed(1) + " " + qsTr("Hz") : "--"),
-									valueColor: root.heaterDisconnected
-										? Qt.alpha(Theme.color_font_primary, 0.5)
-										: Theme.color_font_primary,
-									iconColor: root.heaterDisconnected
-										? Qt.alpha(Theme.color_font_secondary, 0.5)
-										: Theme.color_font_secondary
-								}
-							]
-
-							GridLayout {
+							Rectangle {
 								anchors.fill: parent
-								columns: 2
-								rowSpacing: 8
-								columnSpacing: 8
+								radius: 8
+								color: Qt.rgba(1, 1, 1, 0.05)
+								border.width: 1.5
+								border.color: Theme.color_blue
+							}
 
-								Repeater {
-									model: statusIndicatorHeader.cells
+							Row {
+								anchors.fill: parent
 
-									Rectangle {
-										required property var modelData
+								Button {
+									height: rightTabBar.height
+									width: rightTabBar.width / 2
+									text: qsTr("Timer")
+									flat: false
+									backgroundColor: root.rightTabIndex === 0 ? Theme.color_blue : "transparent"
+									borderColor: "transparent"
+									color: root.rightTabIndex === 0 ? Theme.color_white : Theme.color_font_secondary
+									font.pixelSize: Theme.font_size_body1
+									onClicked: root.rightTabIndex = 0
+								}
 
-										Layout.fillWidth: true
-										Layout.preferredHeight: 56
-										radius: 8
-										color: Qt.rgba(1, 1, 1, 0.05)
+								Button {
+									height: rightTabBar.height
+									width: rightTabBar.width / 2
+									text: qsTr("Status")
+									flat: false
+									backgroundColor: root.rightTabIndex === 1 ? Theme.color_blue : "transparent"
+									borderColor: "transparent"
+									color: root.rightTabIndex === 1 ? Theme.color_white : Theme.color_font_secondary
+									font.pixelSize: Theme.font_size_body1
+									onClicked: root.rightTabIndex = 1
+								}
+							}
+						}
 
-										RowLayout {
-											anchors {
-												fill: parent
-												leftMargin: 12
-												rightMargin: 12
-											}
-											spacing: 8
+						// TAB 1 — Timer (placeholder until the timer backend is wired)
+						Item {
+							id: timerTabContent
 
-											CP.ColorImage {
-												Layout.alignment: Qt.AlignVCenter
-												Layout.preferredWidth: modelData.iconSize !== undefined ? modelData.iconSize : 22
-												Layout.preferredHeight: modelData.iconSize !== undefined ? modelData.iconSize : 22
-												source: modelData.icon
-												color: modelData.iconColor
-											}
+							anchors {
+								top: rightTabBar.bottom
+								topMargin: 8
+								left: parent.left
+								right: parent.right
+								bottom: statusInfoRow.top
+								bottomMargin: 4
+							}
+							visible: root.rightTabIndex === 0
 
-											ColumnLayout {
-												Layout.alignment: Qt.AlignVCenter
-												spacing: 0
+							EmptyPageItem {
+								anchors.centerIn: parent
+								width: Math.min(parent.width, Theme.geometry_screen_width * 0.7)
+								titleText: qsTr("Timer")
+								imageSource: root.heaterIcon
+								imageColor: Theme.color_font_primary
+								primaryText: qsTr("No timer configured.")
+								secondaryText: qsTr("Timer settings will appear here.")
+							}
 
-												Label {
-													Layout.fillWidth: true
-													font.pixelSize: Theme.font_size_caption
-													color: Theme.color_font_secondary
-													text: modelData.label
+						}
+
+						// TAB 2 — Status (live telemetry, status line, start/stop)
+						Item {
+							id: statusTabContent
+
+							anchors {
+								top: rightTabBar.bottom
+								topMargin: 8
+								left: parent.left
+								right: parent.right
+								bottom: statusInfoRow.top
+								bottomMargin: 4
+							}
+							visible: root.rightTabIndex === 1
+
+							// Telemetry grid: 2-column status card, each item in its own cell.
+							Item {
+								id: statusIndicatorHeader
+
+								anchors {
+									top: parent.top
+									left: parent.left
+									right: parent.right
+								}
+								visible: root.hasHeater
+								height: visible ? 184 : 0
+
+								readonly property var cells: [
+									{
+										icon: "qrc:/images/icon_propeller.svg",
+										iconSize: 20,
+										label: qsTr("Fan"),
+										value: root.heaterDisconnected ? "--"
+											: (fanRpmActual.valid ? fanRpmActual.value + " " + qsTr("RPM") : "--"),
+										valueColor: root.heaterDisconnected
+											? Qt.alpha(Theme.color_font_primary, 0.5)
+											: Theme.color_font_primary,
+										iconColor: root.heaterDisconnected
+											? Qt.alpha(Theme.color_font_secondary, 0.5)
+											: Theme.color_font_secondary
+									},
+									{
+										icon: "qrc:/images/icon_engine_temp_32.svg",
+										label: qsTr("Heater temp."),
+										value: root.heaterDisconnected ? "--"
+											: (heaterTemperature.valid ? heaterTemperature.value + "°C" : "--"),
+										valueColor: root.heaterDisconnected
+											? Qt.alpha(Theme.color_font_primary, 0.5)
+											: Theme.color_font_primary,
+										iconColor: root.heaterDisconnected
+											? Qt.alpha(Theme.color_font_secondary, 0.5)
+											: Theme.color_font_secondary
+									},
+									{
+										icon: "qrc:/images/icon_temp_32.svg",
+										label: qsTr("Room temp."),
+										value: roomTemperature.valid
+											? root.formatTemperatureValue(roomTemperature)
+											: (internalTemperature.valid ? internalTemperature.value + "°C" : "--"),
+										valueColor: Theme.color_font_primary,
+										iconColor: Theme.color_font_secondary
+									},
+									{
+										icon: "qrc:/images/icon_temp_32.svg",
+										label: qsTr("Internal temp."),
+										value: root.heaterDisconnected ? "--"
+											: (internalTemperature.valid ? internalTemperature.value + "°C" : "--"),
+										valueColor: root.heaterDisconnected
+											? Qt.alpha(Theme.color_font_primary, 0.5)
+											: Theme.color_font_primary,
+										iconColor: root.heaterDisconnected
+											? Qt.alpha(Theme.color_font_secondary, 0.5)
+											: Theme.color_font_secondary
+									},
+									{
+										icon: root.heaterDisconnected ? root.alertIcon : "qrc:/images/icon_checkmark_32.svg",
+										valueBold: false,
+										label: qsTr("Status"),
+										value: root.heaterDisconnected ? qsTr("Disconnected")
+											: ((errorCode.valid && errorCode.value !== 0) ? qsTr("Error") : qsTr("OK")),
+										valueColor: root.heaterDisconnected
+											? Qt.alpha(Theme.color_font_primary, 0.5)
+											: Theme.color_font_primary,
+										iconColor: root.heaterDisconnected ? Theme.color_red : Theme.color_green
+									},
+									{
+										icon: root.pumpIcon,
+										label: qsTr("Fuel pump freq."),
+										value: root.heaterDisconnected ? "--"
+											: (fuelPumpFrequency.valid ? fuelPumpFrequency.value.toFixed(1) + " " + qsTr("Hz") : "--"),
+										valueColor: root.heaterDisconnected
+											? Qt.alpha(Theme.color_font_primary, 0.5)
+											: Theme.color_font_primary,
+										iconColor: root.heaterDisconnected
+											? Qt.alpha(Theme.color_font_secondary, 0.5)
+											: Theme.color_font_secondary
+									}
+								]
+
+								GridLayout {
+									anchors.fill: parent
+									columns: 2
+									rowSpacing: 8
+									columnSpacing: 8
+
+									Repeater {
+										model: statusIndicatorHeader.cells
+
+										Rectangle {
+											required property var modelData
+
+											Layout.fillWidth: true
+											Layout.preferredHeight: 56
+											radius: 8
+											color: Qt.rgba(1, 1, 1, 0.05)
+
+											RowLayout {
+												anchors {
+													fill: parent
+													leftMargin: 12
+													rightMargin: 12
+												}
+												spacing: 8
+
+												CP.ColorImage {
+													Layout.alignment: Qt.AlignVCenter
+													Layout.preferredWidth: modelData.iconSize !== undefined ? modelData.iconSize : 22
+													Layout.preferredHeight: modelData.iconSize !== undefined ? modelData.iconSize : 22
+													source: modelData.icon
+													color: modelData.iconColor
 												}
 
-												Label {
-													Layout.fillWidth: true
-													font.pixelSize: Theme.font_size_body1
-													font.bold: modelData.valueBold !== undefined ? modelData.valueBold : true
-													elide: Label.ElideRight
-													color: modelData.valueColor
-													text: modelData.value
+												ColumnLayout {
+													Layout.alignment: Qt.AlignVCenter
+													spacing: 0
+
+													Label {
+														Layout.fillWidth: true
+														font.pixelSize: Theme.font_size_caption
+														color: Theme.color_font_secondary
+														text: modelData.label
+													}
+
+													Label {
+														Layout.fillWidth: true
+														font.pixelSize: Theme.font_size_body1
+														font.bold: modelData.valueBold !== undefined ? modelData.valueBold : true
+														elide: Label.ElideRight
+														color: modelData.valueColor
+														text: modelData.value
+													}
 												}
 											}
 										}
 									}
 								}
 							}
+
 						}
 
-						Rectangle {
-							id: statusCard
+						// Live status line: always visible, directly above the start/stop button,
+						// on both tabs (Timer and Status).
+						Row {
+							id: statusInfoRow
 
 							anchors {
-								top: statusIndicatorHeader.bottom
-								topMargin: 8
 								left: parent.left
 								right: parent.right
+								bottom: actionButton.top
+								bottomMargin: 4
 							}
-							height: 93
-							radius: 8
-							color: "transparent"
+							spacing: 8
 
-							Row {
-								anchors {
-									left: parent.left
-									right: parent.right
-									bottom: parent.bottom
-									bottomMargin: 4
-								}
-								spacing: 8
+							CP.ColorImage {
+								anchors.verticalCenter: parent.verticalCenter
+								width: 18
+								height: 18
+								source: root.heaterDisconnected ? root.alertIcon : root.infoIcon
+								fillMode: Image.PreserveAspectFit
+								color: root.heaterDisconnected ? Theme.color_red : Theme.color_font_secondary
+							}
 
-								CP.ColorImage {
-									anchors.verticalCenter: parent.verticalCenter
-									width: 18
-									height: 18
-									source: root.heaterDisconnected ? root.alertIcon : root.infoIcon
-									fillMode: Image.PreserveAspectFit
-									color: root.heaterDisconnected ? Theme.color_red : Theme.color_font_secondary
-								}
-
-								Label {
-									width: parent.width - 26
-									text: root.statusDescription
-									wrapMode: Text.WordWrap
-									maximumLineCount: 2
-									elide: Text.ElideRight
-									verticalAlignment: Text.AlignBottom
-									color: root.heaterDisconnected ? Theme.color_red : Theme.color_font_secondary
-									font.pixelSize: Theme.font_size_body1
-								}
+							Label {
+								width: parent.width - 26
+								text: root.statusDescription
+								wrapMode: Text.WordWrap
+								maximumLineCount: 2
+								elide: Text.ElideRight
+								verticalAlignment: Text.AlignBottom
+								color: root.heaterDisconnected ? Theme.color_red : Theme.color_font_secondary
+								font.pixelSize: Theme.font_size_body1
 							}
 						}
 
+						// Start/stop stays visible at the bottom of the right column,
+						// independent of the active tab.
 						Button {
 							id: actionButton
 
+							// Bottom-aligned with the left column mode chips (chips sit at 342px from
+							// the column top: dialArea 280 + topMargin 12 + chip height 50). Both
+							// columns share the same top/height, so this tracks the chips regardless
+							// of page height or whether the bottom navbar is shown.
 							anchors {
 								left: parent.left
 								right: parent.right
-								top: statusCard.bottom
-								topMargin: 5
+								bottom: parent.bottom
+								bottomMargin: parent.height - 342
 							}
 							height: 52
 							opacity: enabled ? 1.0 : 0.5
@@ -882,6 +969,7 @@ SwipeViewPage {
 								startRequested: !root.isRunning
 							})
 						}
+
 					}
 				}
 			}
