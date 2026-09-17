@@ -480,15 +480,12 @@ SwipeViewPage {
 				}
 				Row {
 					id: cardRow
-					border.width: 2
-
 					anchors.fill: parent
 					spacing: 24
 
 					// LEFT column
 					Item {
 						id: leftColumn
-					border.width: 2
 
 						width: Math.round(parent.width * 0.50)
 						height: parent.height
@@ -502,16 +499,24 @@ SwipeViewPage {
 								right: parent.right
 							}
 							height: 280
+							// DEBUG: red border showing dialArea bounds vs ring
+							Rectangle {
+								anchors.fill: parent
+								color: "transparent"
+								border.color: "red"
+								border.width: 2
+							}
 
 							CircularHeaterRing {
 								id: ring
 								opacity: root.dialEnabled ? 1.0 : 0.5
 
-
+								width: Math.min(dialArea.width * 0.9, dialArea.height, 280)
+								height: width
 								anchors {
-									fill: parent
-									border.color: "red"
-									border.width: 2
+									top: parent.top
+									topMargin: 0
+									horizontalCenter: parent.horizontalCenter
 								}
 								valueRatio: root.ringValueRatio
 								progressColor: root.ringStateColor
@@ -592,7 +597,6 @@ SwipeViewPage {
 
 							Row {
 								id: modeBlockRow
-					border.width: 2
 								spacing: 12
 								anchors.horizontalCenter: parent.horizontalCenter
 
@@ -703,7 +707,6 @@ SwipeViewPage {
 					// RIGHT column
 					Item {
 						id: rightColumn
-					border.width: 2
 
 						width: parent.width - leftColumn.width - cardRow.spacing
 						height: parent.height
@@ -1044,7 +1047,6 @@ SwipeViewPage {
 						// on both tabs (Timer and Status).
 						Row {
 							id: statusInfoRow
-					border.width: 2
 
 							anchors {
 								left: parent.left
