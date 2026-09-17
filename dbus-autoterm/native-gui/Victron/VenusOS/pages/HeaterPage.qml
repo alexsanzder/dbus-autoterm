@@ -45,9 +45,14 @@ SwipeViewPage {
 	readonly property string timerDailyUsageText: "--:--:--"
 	// Arming a timer only makes sense once a mode is chosen — same gate as
 	// the Start button, with "off" counting as no mode. While the heater
-	// runs, keep the panel adjustable for the live countdown.
-	readonly property bool timerPanelEnabled: (root.selectedModeKey !== "" && root.selectedModeKey !== "off")
-		|| root.isRunning
+	// runs, keep the panel adjustable for the live countdown — but lock it
+	// during start/stop transitions (starting, warming up, cooling down).
+	readonly property bool heaterTransitioning: isTransitioning
+		|| (stateText.valid && (stateText.value === "starting" || stateText.value === "starting ventilation"
+			|| stateText.value === "warming up" || stateText.value === "shutting down"
+			|| stateText.value === "stopping ventilation"))
+	readonly property bool timerPanelEnabled: !heaterTransitioning
+		&& ((root.selectedModeKey !== "" && root.selectedModeKey !== "off") || root.isRunning)
 
 	readonly property int heaterCount: heaterModel ? heaterModel.count : 0
 	readonly property var currentHeater: heaterModel ? heaterModel.deviceAt(currentHeaterIndex) : null
@@ -466,8 +471,16 @@ SwipeViewPage {
 
 				// Fixed two-column card for 7" displays: dial + start/stop on the left,
 				// telemetry, status, and mode selection on the right. No scrolling.
+				// Debugging: red border around main content
+				Rectangle {
+					anchors.fill: parent
+					border.color: "red"
+					border.width: 2
+					color: "transparent"
+				}
 				Row {
 					id: cardRow
+					border.width: 2
 
 					anchors.fill: parent
 					spacing: 24
@@ -475,12 +488,14 @@ SwipeViewPage {
 					// LEFT column
 					Item {
 						id: leftColumn
+					border.width: 2
 
 						width: Math.round(parent.width * 0.50)
 						height: parent.height
 
 						Item {
 							id: dialArea
+					border.width: 2
 
 							anchors {
 								top: parent.top
@@ -580,6 +595,7 @@ SwipeViewPage {
 
 							Row {
 								id: modeBlockRow
+					border.width: 2
 								spacing: 12
 								anchors.horizontalCenter: parent.horizontalCenter
 
@@ -690,6 +706,7 @@ SwipeViewPage {
 					// RIGHT column
 					Item {
 						id: rightColumn
+					border.width: 2
 
 						width: parent.width - leftColumn.width - cardRow.spacing
 						height: parent.height
@@ -769,7 +786,7 @@ SwipeViewPage {
 								// Reset button sits at the right of the number.
 								Item {
 									Layout.fillWidth: true
-									Layout.preferredHeight: timerValueLabel.implicitHeight
+									Layout.preferredHeight: Math.max(timerValueLabel.implicitHeight, 44)
 
 									Label {
 										id: timerValueLabel
@@ -778,10 +795,12 @@ SwipeViewPage {
 										font.bold: false
 										color: Theme.color_white
 										text: root.timerDisplayText
-										opacity: root.timerPanelEnabled ? 1.0 : 0.5
+										opacity: (root.hasHeater && !root.heaterDisconnected && root.timerPanelEnabled) ? 1.0 : 0.5
 									}
 
 									Button {
+										id: timerResetButton
+
 										anchors {
 											right: parent.right
 											verticalCenter: parent.verticalCenter
@@ -791,10 +810,18 @@ SwipeViewPage {
 										text: ""
 										flat: false
 										visible: root.timerSelectedMinutes > 0 || root.timerRunning
+										enabled: root.hasHeater && !root.heaterDisconnected && root.timerPanelEnabled
+										opacity: enabled ? 1.0 : 0.5
 										backgroundColor: Theme.color_gray1
 										borderColor: Theme.color_gray1
 										color: Theme.color_white
-										onClicked: root.resetTimer()
+										onClicked: {
+											if (root.isRunning) {
+												Global.dialogLayer.open(timerResetDialogComponent)
+											} else {
+												root.resetTimer()
+											}
+										}
 
 										CP.ColorImage {
 											anchors.centerIn: parent
@@ -820,16 +847,14 @@ SwipeViewPage {
 										Button {
 											required property var modelData
 
-											readonly property bool selected: false
-
 											Layout.fillWidth: true
 											Layout.preferredHeight: 52
 											text: "+" + modelData + "\n" + qsTr("min")
 											flat: false
 											enabled: root.hasHeater && !root.heaterDisconnected && root.timerPanelEnabled
 											opacity: enabled ? 1.0 : 0.5
-											backgroundColor: selected ? Theme.color_blue : Theme.color_gray1
-											borderColor: selected ? Theme.color_blue : Theme.color_gray1
+											backgroundColor: Theme.color_gray1
+											borderColor: Theme.color_gray1
 											color: Theme.color_white
 											font.pixelSize: Theme.font_size_body1
 											onClicked: root.addTimerMinutes(modelData)
@@ -854,6 +879,7 @@ SwipeViewPage {
 											borderColor: selected ? Theme.color_blue : Theme.color_gray1
 											color: Theme.color_white
 											font.pixelSize: Theme.font_size_body1
+											font.bold: true
 											onClicked: root.setTimerDuration(modelData)
 										}
 									}
@@ -1021,6 +1047,7 @@ SwipeViewPage {
 						// on both tabs (Timer and Status).
 						Row {
 							id: statusInfoRow
+					border.width: 2
 
 							anchors {
 								left: parent.left
@@ -1178,7 +1205,9 @@ SwipeViewPage {
 			if (root.timerRemainingSeconds === 0) {
 				root.timerRunning = false
 				root.timerSelectedMinutes = 0
-				// TODO: send heater stop when the backend timer is wired
+				// Timer done: stop the heater immediately.
+				root.pendingStartStopAction = "stop"
+				startStop.setValue(0)
 			}
 		}
 	}
@@ -1193,6 +1222,11 @@ SwipeViewPage {
 			} else if (root.pendingStartStopAction === "stop"
 				&& (heaterState.value === 0 || heaterState.value === 10)) {
 				root.pendingStartStopAction = ""
+			}
+			// Heater stopped for any reason (manual stop, fault, shutdown):
+			// cancel the countdown. The armed value stays for the next start.
+			if (heaterState.value === 0 || heaterState.value === 10) {
+				root.stopTimer()
 			}
 		}
 	}
@@ -1241,6 +1275,22 @@ SwipeViewPage {
 		}
 	}
 
+	Component {
+		id: timerResetDialogComponent
+
+		ModalWarningDialog {
+			title: qsTr("Reset timer?")
+			description: qsTr("The heater is running. The timer will be cancelled and the heater will keep running.")
+			dialogDoneOptions: VenusOS.ModalDialog_DoneOptions_OkAndCancel
+			acceptText: qsTr("Reset timer")
+			onClosed: {
+				if (result === T.Dialog.Accepted) {
+					root.resetTimer()
+				}
+			}
+		}
+	}
+
 	function setTimerDuration(minutes) {
 		if (timerSelectedMinutes === minutes) {
 			timerSelectedMinutes = 0
@@ -1249,6 +1299,9 @@ SwipeViewPage {
 		timerSelectedMinutes = minutes
 		if (timerRunning) {
 			timerRemainingSeconds = minutes * 60
+		} else if (isRunning) {
+			// Heater already running: start the countdown immediately.
+			startTimer()
 		}
 	}
 
@@ -1256,6 +1309,9 @@ SwipeViewPage {
 		timerSelectedMinutes = Math.max(0, Math.min(timerSelectedMinutes + minutes, 720))
 		if (timerRunning) {
 			timerRemainingSeconds = Math.max(0, Math.min(timerRemainingSeconds + minutes * 60, 720 * 60))
+		} else if (isRunning && timerSelectedMinutes > 0) {
+			// Heater already running: start the countdown immediately.
+			startTimer()
 		}
 	}
 
