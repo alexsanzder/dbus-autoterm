@@ -35,9 +35,7 @@ Item {
 
 	Item {
 		id: ringBounds
-		width: root.arcRadius * 2
-		height: root.arcRadius * 2
-		anchors.centerIn: parent
+		anchors.fill: parent
 
 		ProgressArc {
 			anchors.fill: parent

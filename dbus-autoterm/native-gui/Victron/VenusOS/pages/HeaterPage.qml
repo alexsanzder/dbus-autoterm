@@ -471,13 +471,6 @@ SwipeViewPage {
 
 				// Fixed two-column card for 7" displays: dial + start/stop on the left,
 				// telemetry, status, and mode selection on the right. No scrolling.
-				// Debugging: red border around main content
-				Rectangle {
-					anchors.fill: parent
-					border.color: "red"
-					border.width: 2
-					color: "transparent"
-				}
 				Row {
 					id: cardRow
 					anchors.fill: parent
@@ -499,14 +492,6 @@ SwipeViewPage {
 								right: parent.right
 							}
 							height: 280
-							// DEBUG: red border showing dialArea bounds vs ring
-							Rectangle {
-								anchors.fill: parent
-								color: "transparent"
-								border.color: "red"
-								border.width: 2
-							}
-
 							CircularHeaterRing {
 								id: ring
 								opacity: root.dialEnabled ? 1.0 : 0.5
