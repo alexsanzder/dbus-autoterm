@@ -19,7 +19,35 @@ SwipeViewPage {
 	property bool dialEnabled: false
 	property string selectedModeKey: ""
 	property string lastModeKey: ""
-	property int rightTabIndex: 1
+	property int rightTabIndex: 0
+	property real primaryValueFontScale: 1.5
+
+	// Timer tab state (UI-only until the backend timer paths are wired).
+	// Duration range per Comfort Control manual: 30-720 min in 5-min steps.
+	property int timerSelectedMinutes: 0
+	property int timerRemainingSeconds: 0
+	property bool timerRunning: false	
+	readonly property var timerStepMinutes: [5, 15, 30]
+	readonly property var timerPresetMinutes: [30, 60, 90]
+	readonly property string timerDisplayText: {
+		const total = timerRunning ? timerRemainingSeconds : timerSelectedMinutes * 60
+		if (total <= 0) {
+			return "--:--"
+		}
+		const hours = Math.floor(total / 3600)
+		const minutes = Math.floor((total % 3600) / 60)
+		const seconds = total % 60
+		return (hours > 0 ? String(hours).padStart(2, "0") + ":" : "")
+			+ String(minutes).padStart(2, "0") + ":"
+			+ String(seconds).padStart(2, "0")
+	}
+	// TODO: wire to the backend daily-usage counter once it exists.
+	readonly property string timerDailyUsageText: "--:--:--"
+	// Arming a timer only makes sense once a mode is chosen — same gate as
+	// the Start button, with "off" counting as no mode. While the heater
+	// runs, keep the panel adjustable for the live countdown.
+	readonly property bool timerPanelEnabled: (root.selectedModeKey !== "" && root.selectedModeKey !== "off")
+		|| root.isRunning
 
 	readonly property int heaterCount: heaterModel ? heaterModel.count : 0
 	readonly property var currentHeater: heaterModel ? heaterModel.deviceAt(currentHeaterIndex) : null
@@ -30,6 +58,8 @@ SwipeViewPage {
 	readonly property url powerIcon: Qt.resolvedUrl("../images/icon_power.svg")
 	readonly property url pumpIcon: Qt.resolvedUrl("../images/icon_pump.svg")
 	readonly property url alertIcon: Qt.resolvedUrl("../images/icon_alert.svg")
+	readonly property url timerRemoveIcon: Qt.resolvedUrl("../images/icon_timer_remove.svg")
+	readonly property url fanClockIcon: Qt.resolvedUrl("../images/icon_fan_clock.svg")
 	readonly property bool hasHeater: !!currentHeater
 	readonly property bool heaterDisconnected: communicationAlarm.valid && communicationAlarm.value !== 0
 	readonly property bool isRunning: heaterState.valid && heaterState.value !== 0 && heaterState.value !== 10
@@ -136,18 +166,18 @@ SwipeViewPage {
 	]
 
 	readonly property string activeModeDescription: {
-		// When off is active (no chip selected) show placeholder regardless
-		// of the heater's current mode — matches "Select a heater mode..."
-		// spec for initial idle state.
-		if (root.selectedModeKey === "off" && !root.isRunning) {
-			return qsTr("Select a heater mode for more details.")
+		// When nothing is selected (initial "" or Off chip) show placeholder
+		// regardless of the heater's current mode — matches "Select a heater
+		// mode..." spec for initial idle state.
+		if ((root.selectedModeKey === "off" || root.selectedModeKey === "") && !root.isRunning) {
+			return qsTr("Select a mode to start the heater.")
 		}
 		for (let i = 0; i < modeCards.length; ++i) {
 			if (modeCards[i].key === activeModeCardKey) {
 				return modeCards[i].description
 			}
 		}
-		return qsTr("Select a heater mode for more details.")
+		return qsTr("Select a mode to start the heater.")
 	}
 
 	readonly property string selectedModeLabel: {
@@ -203,7 +233,7 @@ SwipeViewPage {
 		if (root.heaterDisconnected) {
 			return qsTr("Heater not connected.")
 		}
-		if (!stateText.valid) {
+		if (!stateText.valid || stateText.value === "off") {
 			return activeModeDescription
 		}
 		const room = root.formatTemperatureValue(roomTemperature)
@@ -726,14 +756,108 @@ SwipeViewPage {
 							}
 							visible: root.rightTabIndex === 0
 
-							EmptyPageItem {
-								anchors.centerIn: parent
-								width: Math.min(parent.width, Theme.geometry_screen_width * 0.7)
-								titleText: qsTr("Timer")
-								imageSource: root.heaterIcon
-								imageColor: Theme.color_font_primary
-								primaryText: qsTr("No timer configured.")
-								secondaryText: qsTr("Timer settings will appear here.")
+							ColumnLayout {
+								anchors {
+									top: parent.top
+									topMargin: 4
+									left: parent.left
+									right: parent.right
+								}
+								spacing: 6
+
+								// Big timer display: armed duration or live countdown, centered.
+								// Reset button sits at the right of the number.
+								Item {
+									Layout.fillWidth: true
+									Layout.preferredHeight: timerValueLabel.implicitHeight
+
+									Label {
+										id: timerValueLabel
+										anchors.centerIn: parent
+										font.pixelSize: Theme.font_size_h1 * root.primaryValueFontScale
+										font.bold: false
+										color: Theme.color_white
+										text: root.timerDisplayText
+										opacity: root.timerPanelEnabled ? 1.0 : 0.5
+									}
+
+									Button {
+										anchors {
+											right: parent.right
+											verticalCenter: parent.verticalCenter
+										}
+										width: 44
+										height: 44
+										text: ""
+										flat: false
+										visible: root.timerSelectedMinutes > 0 || root.timerRunning
+										backgroundColor: Theme.color_gray1
+										borderColor: Theme.color_gray1
+										color: Theme.color_white
+										onClicked: root.resetTimer()
+
+										CP.ColorImage {
+											anchors.centerIn: parent
+											width: 28
+											height: 28
+											source: root.timerRemoveIcon
+											fillMode: Image.PreserveAspectFit
+											color: Theme.color_white
+										}
+									}
+								}
+
+								// Row 1: add minutes to the armed timer. Row 2: predefined durations.
+								GridLayout {
+									Layout.fillWidth: true
+									columns: 3
+									columnSpacing: 8
+									rowSpacing: 8
+
+									Repeater {
+										model: root.timerStepMinutes
+
+										Button {
+											required property var modelData
+
+											readonly property bool selected: false
+
+											Layout.fillWidth: true
+											Layout.preferredHeight: 52
+											text: "+" + modelData + "\n" + qsTr("min")
+											flat: false
+											enabled: root.hasHeater && !root.heaterDisconnected && root.timerPanelEnabled
+											opacity: enabled ? 1.0 : 0.5
+											backgroundColor: selected ? Theme.color_blue : Theme.color_gray1
+											borderColor: selected ? Theme.color_blue : Theme.color_gray1
+											color: Theme.color_white
+											font.pixelSize: Theme.font_size_body1
+											onClicked: root.addTimerMinutes(modelData)
+										}
+									}
+
+									Repeater {
+										model: root.timerPresetMinutes
+
+										Button {
+											required property var modelData
+
+											readonly property bool selected: modelData === root.timerSelectedMinutes
+
+											Layout.fillWidth: true
+											Layout.preferredHeight: 52
+											text: modelData + "\n" + qsTr("min")
+											flat: false
+											enabled: root.hasHeater && !root.heaterDisconnected && root.timerPanelEnabled
+											opacity: enabled ? 1.0 : 0.5
+											backgroundColor: selected ? Theme.color_blue : Theme.color_gray1
+											borderColor: selected ? Theme.color_blue : Theme.color_gray1
+											color: Theme.color_white
+											font.pixelSize: Theme.font_size_body1
+											onClicked: root.setTimerDuration(modelData)
+										}
+									}
+								}
 							}
 
 						}
@@ -766,23 +890,18 @@ SwipeViewPage {
 
 								readonly property var cells: [
 									{
+										icon: root.fanClockIcon,
+										label: qsTr("Timer"),
+										value: root.timerDisplayText,
+										valueColor: Theme.color_font_primary,
+										iconColor: Theme.color_font_secondary
+									},
+									{
 										icon: "qrc:/images/icon_propeller.svg",
 										iconSize: 20,
 										label: qsTr("Fan"),
 										value: root.heaterDisconnected ? "--"
 											: (fanRpmActual.valid ? fanRpmActual.value + " " + qsTr("RPM") : "--"),
-										valueColor: root.heaterDisconnected
-											? Qt.alpha(Theme.color_font_primary, 0.5)
-											: Theme.color_font_primary,
-										iconColor: root.heaterDisconnected
-											? Qt.alpha(Theme.color_font_secondary, 0.5)
-											: Theme.color_font_secondary
-									},
-									{
-										icon: "qrc:/images/icon_engine_temp_32.svg",
-										label: qsTr("Heater temp."),
-										value: root.heaterDisconnected ? "--"
-											: (heaterTemperature.valid ? heaterTemperature.value + "°C" : "--"),
 										valueColor: root.heaterDisconnected
 											? Qt.alpha(Theme.color_font_primary, 0.5)
 											: Theme.color_font_primary,
@@ -800,10 +919,10 @@ SwipeViewPage {
 										iconColor: Theme.color_font_secondary
 									},
 									{
-										icon: "qrc:/images/icon_temp_32.svg",
-										label: qsTr("Internal temp."),
+										icon: "qrc:/images/icon_engine_temp_32.svg",
+										label: qsTr("Heater temp."),
 										value: root.heaterDisconnected ? "--"
-											: (internalTemperature.valid ? internalTemperature.value + "°C" : "--"),
+											: (heaterTemperature.valid ? heaterTemperature.value + "°C" : "--"),
 										valueColor: root.heaterDisconnected
 											? Qt.alpha(Theme.color_font_primary, 0.5)
 											: Theme.color_font_primary,
@@ -812,21 +931,22 @@ SwipeViewPage {
 											: Theme.color_font_secondary
 									},
 									{
-										icon: root.heaterDisconnected ? root.alertIcon : "qrc:/images/icon_checkmark_32.svg",
-										valueBold: false,
-										label: qsTr("Status"),
-										value: root.heaterDisconnected ? qsTr("Disconnected")
-											: ((errorCode.valid && errorCode.value !== 0) ? qsTr("Error") : qsTr("OK")),
-										valueColor: root.heaterDisconnected
-											? Qt.alpha(Theme.color_font_primary, 0.5)
-											: Theme.color_font_primary,
-										iconColor: root.heaterDisconnected ? Theme.color_red : Theme.color_green
-									},
-									{
 										icon: root.pumpIcon,
 										label: qsTr("Fuel pump freq."),
 										value: root.heaterDisconnected ? "--"
 											: (fuelPumpFrequency.valid ? fuelPumpFrequency.value.toFixed(1) + " " + qsTr("Hz") : "--"),
+										valueColor: root.heaterDisconnected
+											? Qt.alpha(Theme.color_font_primary, 0.5)
+											: Theme.color_font_primary,
+										iconColor: root.heaterDisconnected
+											? Qt.alpha(Theme.color_font_secondary, 0.5)
+											: Theme.color_font_secondary
+									},
+									{
+										icon: "qrc:/images/icon_temp_32.svg",
+										label: qsTr("Internal temp."),
+										value: root.heaterDisconnected ? "--"
+											: (internalTemperature.valid ? internalTemperature.value + "°C" : "--"),
 										valueColor: root.heaterDisconnected
 											? Qt.alpha(Theme.color_font_primary, 0.5)
 											: Theme.color_font_primary,
@@ -1047,6 +1167,22 @@ SwipeViewPage {
 		uid: root.bindPrefix + "/Alarms/Communication"
 	}
 
+	// UI-side countdown ticker. TODO: replace with backend timer state once wired.
+	Timer {
+		id: timerTicker
+		interval: 1000
+		running: root.timerRunning && root.timerRemainingSeconds > 0
+		repeat: true
+		onTriggered: {
+			root.timerRemainingSeconds -= 1
+			if (root.timerRemainingSeconds === 0) {
+				root.timerRunning = false
+				root.timerSelectedMinutes = 0
+				// TODO: send heater stop when the backend timer is wired
+			}
+		}
+	}
+
 	Connections {
 		target: heaterState
 
@@ -1075,6 +1211,12 @@ SwipeViewPage {
 				if (result === T.Dialog.Accepted) {
 					root.pendingStartStopAction = startRequested ? "start" : "stop"
 					startStop.setValue(startRequested ? 1 : 0)
+					// Timer tab: armed countdown starts/stops with the heater.
+					if (startRequested) {
+						root.startTimer()
+					} else {
+						root.stopTimer()
+					}
 				}
 			}
 		}
@@ -1097,6 +1239,43 @@ SwipeViewPage {
 				}
 			}
 		}
+	}
+
+	function setTimerDuration(minutes) {
+		if (timerSelectedMinutes === minutes) {
+			timerSelectedMinutes = 0
+			return
+		}
+		timerSelectedMinutes = minutes
+		if (timerRunning) {
+			timerRemainingSeconds = minutes * 60
+		}
+	}
+
+	function addTimerMinutes(minutes) {
+		timerSelectedMinutes = Math.max(0, Math.min(timerSelectedMinutes + minutes, 720))
+		if (timerRunning) {
+			timerRemainingSeconds = Math.max(0, Math.min(timerRemainingSeconds + minutes * 60, 720 * 60))
+		}
+	}
+
+	function resetTimer() {
+		timerSelectedMinutes = 0
+		timerRunning = false
+		timerRemainingSeconds = 0
+	}
+
+	function startTimer() {
+		if (timerSelectedMinutes <= 0) {
+			return
+		}
+		timerRemainingSeconds = timerSelectedMinutes * 60
+		timerRunning = true
+	}
+
+	function stopTimer() {
+		timerRunning = false
+		timerRemainingSeconds = 0
 	}
 
 	function adjustRingValue(delta) {
