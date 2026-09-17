@@ -10,7 +10,7 @@ Item {
 	property color progressColor: Theme.color_blue
 	property color remainderColor: Theme.color_gray1
 	property color centerFillColor: Qt.rgba(0, 0, 0, 0.18)
-	property color centerStrokeColor: Qt.rgba(1, 1, 1, 0.06)
+	property color centerStrokeColor: Theme.color_gray1
 	property color primaryValueColor: Theme.color_font_primary
 	property color secondaryValueColor: Theme.color_listItem_secondaryText
 	property color captionValueColor: Theme.color_listItem_secondaryText
@@ -26,8 +26,8 @@ Item {
 	readonly property real normalizedRatio: clamp(valueRatio, 0.0, 1.0)
 	readonly property real startAngle: 225
 	readonly property real endAngle: 495
-	readonly property real arcRadius: (Math.min(width, height) / 2) - (strokeWidth / 2) - 2
-	readonly property real centerDiameter: (arcRadius * 2) - (strokeWidth * 1.9)
+	readonly property real arcRadius: Math.min(width, height) / 2
+	readonly property real centerDiameter: (arcRadius - strokeWidth) * 2
 
 	function clamp(value, minValue, maxValue) {
 		return Math.max(minValue, Math.min(maxValue, value))
@@ -35,7 +35,9 @@ Item {
 
 	Item {
 		id: ringBounds
-		anchors.fill: parent
+		width: root.arcRadius * 2
+		height: root.arcRadius * 2
+		anchors.centerIn: parent
 
 		ProgressArc {
 			anchors.fill: parent
