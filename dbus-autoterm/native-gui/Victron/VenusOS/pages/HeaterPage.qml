@@ -495,7 +495,6 @@ SwipeViewPage {
 
 						Item {
 							id: dialArea
-					border.width: 2
 
 							anchors {
 								top: parent.top
@@ -508,14 +507,12 @@ SwipeViewPage {
 								id: ring
 								opacity: root.dialEnabled ? 1.0 : 0.5
 
-								width: Math.min(dialArea.width * 0.9, dialArea.height, 280)
-								height: width
-								anchors {
-									top: parent.top
-									topMargin: 0
-									horizontalCenter: parent.horizontalCenter
-								}
 
+								anchors {
+									fill: parent
+									border.color: "red"
+									border.width: 2
+								}
 								valueRatio: root.ringValueRatio
 								progressColor: root.ringStateColor
 								primaryValue: root.ringPrimaryNumber
