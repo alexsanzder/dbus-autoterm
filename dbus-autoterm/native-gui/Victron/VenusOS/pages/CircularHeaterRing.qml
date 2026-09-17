@@ -60,7 +60,7 @@ Item {
 
 			Column {
 				anchors.centerIn: parent
-				spacing: 4
+				spacing: 2
 
 				// Active mode, right above the big value
 				Label {
