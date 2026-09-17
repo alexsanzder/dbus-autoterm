@@ -128,8 +128,14 @@ if [ -f "$app_dir/config.ini" ]; then
 fi
 
 echo "Unpacking archive"
-tar -xzf "$archive_path" -C "$deploy_root"
-
+tar_rc=0
+tar -xzf "$archive_path" -C "$deploy_root" 2>"$deploy_root/tar.log" || tar_rc=$?
+grep -v "LIBARCHIVE.xattr.com.apple.provenance" "$deploy_root/tar.log" >&2 || true
+if [ "$tar_rc" -ne 0 ]; then
+    rm -f "$deploy_root/tar.log"
+    exit "$tar_rc"
+fi
+rm -f "$deploy_root/tar.log"
 echo "Swapping app directory atomically"
 old_dir="$parent_dir/dbus-autoterm.old"
 rm -rf "$old_dir" || true

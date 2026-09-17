@@ -178,7 +178,29 @@ class HeaterDbusAdapter:
         self._heater_mode = HeaterUiMode.POWER
         self._sensor_source = HeaterSensorSource.EXTERNAL
         self._timers = [HeaterTimerEntry() for _ in range(3)]
+        # Per-mode stepper memories (Comfort Control p10-12): Power and
+        # Ventilation keep independent power levels; Temperature and
+        # Heat+Ventilation keep independent setpoints. The heater wire format
+        # carries one active settings payload, so switching UI mode reapplies
+        # the cached value for that mode.
+        self._mode_power = {
+            HeaterUiMode.POWER: 2,
+            HeaterUiMode.VENTILATION: 2,
+            HeaterUiMode.HEAT_VENTILATION: 2,
+            HeaterUiMode.TEMPERATURE: 2,
+        }
+        self._mode_setpoint = {
+            HeaterUiMode.TEMPERATURE: 15,
+            HeaterUiMode.HEAT_VENTILATION: 15,
+        }
         self._init_service()
+
+    def mode_settings_overrides(self) -> dict:
+        """Cached stepper values to reapply when the UI mode changes."""
+        mode = self._heater_mode
+        if mode in {HeaterUiMode.POWER, HeaterUiMode.VENTILATION}:
+            return {"power_level": self._mode_power[mode]}
+        return {"setpoint_c": self._mode_setpoint[mode]}
 
     @property
     def current_heater_mode(self) -> HeaterUiMode:
@@ -369,7 +391,7 @@ class HeaterDbusAdapter:
             self.service.add_path(f"{prefix}/StartMinute", self._timers[index].start_minute, writeable=True, onchangecallback=self._timer_callback(index, "start_minute", 0, 59))
             self.service.add_path(f"{prefix}/DurationMinutes", self._timers[index].duration_minutes, writeable=True, onchangecallback=self._timer_callback(index, "duration_minutes", 1, 24 * 60))
             self.service.add_path(f"{prefix}/Mode", self._timers[index].mode, writeable=True, onchangecallback=self._timer_callback(index, "mode", int(HeaterUiMode.POWER), int(HeaterUiMode.HEAT_VENTILATION)))
-            self.service.add_path(f"{prefix}/TargetTemperature", self._timers[index].target_temperature, writeable=True, onchangecallback=self._timer_callback(index, "target_temperature", 5, 35))
+            self.service.add_path(f"{prefix}/TargetTemperature", self._timers[index].target_temperature, writeable=True, onchangecallback=self._timer_callback(index, "target_temperature", 0, 30))
             self.service.add_path(f"{prefix}/PowerLevel", self._timers[index].power_level, writeable=True, onchangecallback=self._timer_callback(index, "power_level", 1, 9))
         self.service.register()
 
@@ -390,8 +412,6 @@ class HeaterDbusAdapter:
 
         previous_mode = self._heater_mode
         self._heater_mode = new_mode
-        if new_mode == HeaterUiMode.VENTILATION:
-            return True
         if self._on_mode_change is None:
             self._heater_mode = previous_mode
             return False
@@ -413,15 +433,26 @@ class HeaterDbusAdapter:
 
     def _handle_target_temperature_change(self, path: str, value: object) -> bool:
         del path
+        try:
+            setpoint = int(value)
+        except (TypeError, ValueError):
+            return False
+        if self._heater_mode in self._mode_setpoint:
+            self._mode_setpoint[self._heater_mode] = setpoint
         if self._on_target_temperature_change is None:
             return False
-        return self._on_target_temperature_change(int(value))
+        return self._on_target_temperature_change(setpoint)
 
     def _handle_power_level_change(self, path: str, value: object) -> bool:
         del path
+        try:
+            level = int(value)
+        except (TypeError, ValueError):
+            return False
+        self._mode_power[self._heater_mode] = level
         if self._on_power_level_change is None:
             return False
-        return self._on_power_level_change(int(value))
+        return self._on_power_level_change(level)
 
     def _heater_state(self, snapshot: HeaterSnapshot, is_connected: bool) -> int:
         if not is_connected or snapshot.telemetry.error_code:
@@ -485,6 +516,11 @@ class HeaterDbusAdapter:
         else:
             self._heater_mode = HeaterUiMode.TEMPERATURE
         self._sync_sensor_source_from_mode(snapshot.settings.mode)
+        # Keep the active mode's memory in sync with what the heater reports;
+        # other modes keep their independent cached values.
+        self._mode_power[self._heater_mode] = snapshot.settings.power_level
+        if self._heater_mode in self._mode_setpoint:
+            self._mode_setpoint[self._heater_mode] = snapshot.settings.setpoint_c
 
         self.service["/Connected"] = 1 if is_connected else 0
         self.service["/State"] = self._heater_state(snapshot, is_connected)

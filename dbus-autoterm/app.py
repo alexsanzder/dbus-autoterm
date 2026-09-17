@@ -114,7 +114,12 @@ class HeaterDriverApp:
         return True
 
     def update_mode(self, mode: int) -> bool:
-        return self._update_settings(mode=OperatingMode(int(mode)))
+        overrides = self.dbus_adapter.mode_settings_overrides()
+        if self.dbus_adapter.current_heater_mode == HeaterUiMode.VENTILATION:
+            # Ventilation runs via its own start frame (0x23); only the cached
+            # power level needs to be reapplied for the new mode.
+            return self._update_settings(**overrides)
+        return self._update_settings(mode=OperatingMode(int(mode)), **overrides)
 
     def update_target_temperature(self, setpoint_c: int) -> bool:
         return self._update_settings(setpoint_c=int(setpoint_c))

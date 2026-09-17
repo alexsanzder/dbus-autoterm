@@ -16,6 +16,9 @@ SwipeViewPage {
 
 	property int currentHeaterIndex: 0
 	property string pendingStartStopAction: ""
+	property bool dialEnabled: false
+	property string selectedModeKey: ""
+	property string lastModeKey: ""
 
 	readonly property int heaterCount: heaterModel ? heaterModel.count : 0
 	readonly property var currentHeater: heaterModel ? heaterModel.deviceAt(currentHeaterIndex) : null
@@ -26,9 +29,6 @@ SwipeViewPage {
 	readonly property url powerIcon: Qt.resolvedUrl("../images/icon_power.svg")
 	readonly property url pumpIcon: Qt.resolvedUrl("../images/icon_pump.svg")
 	readonly property url alertIcon: Qt.resolvedUrl("../images/icon_alert.svg")
-	property bool dialEnabled: false
-	property string selectedModeKey: ""
-	property string lastModeKey: ""
 	readonly property bool hasHeater: !!currentHeater
 	readonly property bool heaterDisconnected: communicationAlarm.valid && communicationAlarm.value !== 0
 	readonly property bool isRunning: heaterState.valid && heaterState.value !== 0 && heaterState.value !== 10
@@ -37,6 +37,21 @@ SwipeViewPage {
 	readonly property bool isTransitioning: pendingStartStopAction !== ""
 	readonly property bool hasRoomTemperatureControl: roomTemperatureControl.valid && roomTemperatureControl.value === 1
 	readonly property bool isVentilationMode: mode.valid && mode.value === 2
+	// Manual p11-12: heating↔ventilation cross-switch while running is forbidden.
+	// Lock the opposite family while the heater is operating.
+	readonly property bool ventilationLocked: isRunning && !isVentilationMode
+	readonly property bool heatingLocked: isRunning && isVentilationMode
+	// Preview mode for idle Off state — default disabled chip is Temperature
+	// per spec, so ring should show temp not power when heater is off.
+	readonly property string previewModeKey: selectedModeKey !== ""
+		? selectedModeKey
+		: (lastModeKey !== "" ? lastModeKey : "temperature")
+	readonly property bool previewShowTemperatureControl: hasRoomTemperatureControl
+		&& (previewModeKey === "temperature" || previewModeKey === "heat-ventilation")
+	readonly property bool previewShowPowerControl: previewModeKey === "power" || previewModeKey === "ventilation"
+	// Ring display mirrors preview without sensor gate — Off should still show temp preview
+	readonly property bool previewIsTemperatureForRing: previewModeKey === "temperature" || previewModeKey === "heat-ventilation"
+	readonly property bool previewIsPowerForRing: previewModeKey === "power" || previewModeKey === "ventilation"
 	readonly property bool showTemperatureControl: hasRoomTemperatureControl && mode.valid && (mode.value === 1 || mode.value === 3)
 	readonly property bool showPowerControl: mode.valid && (mode.value === 0 || mode.value === 2)
 	readonly property color panelStrokeColor: Theme.color_listItem_secondaryText
@@ -49,22 +64,23 @@ SwipeViewPage {
 			? Qt.rgba(0.62, 0.36, 0.05, 1)  // dark amber while stopped
 			: Qt.rgba(1.0, 0.58, 0.08, 1))
 	readonly property string actionLabel: isStarting
-		? "Starting..."
+		? qsTr("Starting...")
 		: (isStopping
-			? "Stopping..."
+			? qsTr("Stopping...")
 			: (isRunning
-				? (isVentilationMode ? "Stop ventilation" : "Stop heater")
-				: (isVentilationMode ? "Start ventilation" : "Start heater")))
+				? (isVentilationMode ? qsTr("Stop ventilation") : qsTr("Stop heater"))
+				: (isVentilationMode ? qsTr("Start ventilation") : qsTr("Start heater"))))
 	readonly property string actionDescription: isRunning
 		? (isVentilationMode
-			? "The heater will stop ventilation mode."
-			: "The heater will begin its shutdown cycle.")
+			? qsTr("The heater will stop ventilation mode.")
+			: qsTr("The heater will begin its shutdown cycle."))
 		: (isVentilationMode
-			? "The heater will start in ventilation mode."
-			: "The heater will start heating with the current settings.")
+			? qsTr("The heater will start in ventilation mode.")
+			: qsTr("The heater will start heating with the current settings."))
+
 	readonly property string activeModeCardKey: {
 		if (!mode.valid) {
-			return ""
+			return "off"
 		}
 		switch (mode.value) {
 		case 0:
@@ -76,104 +92,149 @@ SwipeViewPage {
 		case 3:
 			return "heat-ventilation"
 		default:
-			return ""
+			return "off"
 		}
 	}
+
 	readonly property var modeCards: [
-		{ key: "temperature", modeValue: 1, label: "Temperature", icon: "qrc:/images/icon_temp_32.svg", description: "Maintain a target room temperature." },
-		{ key: "power", modeValue: 0, label: "Power", icon: root.flameIcon, description: "Run the heater at a fixed power level." },
-		{ key: "heat-ventilation", modeValue: 3, label: "Heat & Vent", icon: root.heaterIcon, description: "Blend heating with ventilation support." },
-		{ key: "thermostat", modeValue: -1, label: "Thermostat", icon: "qrc:/images/icon_temp_coolant_32.svg", description: "Thermostat control placeholder for the custom GUI." },
-		{ key: "ventilation", modeValue: 2, label: "Ventilation", icon: "qrc:/images/icon_propeller.svg", description: "Circulate air without active heating." },
+		{
+			key: "temperature",
+			modeValue: 1,
+			label: qsTr("Temperature"),
+			icon: "qrc:/images/icon_temp_32.svg",
+			description: qsTr("Maintain a target room temperature.")
+		},
+		{
+			key: "power",
+			modeValue: 0,
+			label: qsTr("Power Mode"),
+			icon: root.flameIcon,
+			description: qsTr("Run the heater at a fixed power level.")
+		},
+		{
+			key: "heat-ventilation",
+			modeValue: 3,
+			label: qsTr("Heat & Airflow"),
+			icon: root.heaterIcon,
+			description: qsTr("Blend heating with ventilation support.")
+		},
+		{
+			key: "thermostat",
+			modeValue: -1,
+			label: qsTr("Thermostat"),
+			icon: "qrc:/images/icon_temp_coolant_32.svg",
+			description: qsTr("Thermostat control placeholder for the custom GUI.")
+		},
+		{
+			key: "ventilation",
+			modeValue: 2,
+			label: qsTr("Ventilation Mode"),
+			icon: "qrc:/images/icon_propeller.svg",
+			description: qsTr("Circulate air without active heating.")
+		}
 	]
+
 	readonly property string activeModeDescription: {
+		// When off is active (no chip selected) show placeholder regardless
+		// of the heater's current mode — matches "Select a heater mode..."
+		// spec for initial idle state.
+		if (root.selectedModeKey === "off" && !root.isRunning) {
+			return qsTr("Select a heater mode for more details.")
+		}
 		for (let i = 0; i < modeCards.length; ++i) {
 			if (modeCards[i].key === activeModeCardKey) {
 				return modeCards[i].description
 			}
 		}
-		return "Select a heater mode to see more details here."
+		return qsTr("Select a heater mode for more details.")
 	}
+
 	readonly property string selectedModeLabel: {
 		for (let i = 0; i < modeCards.length; ++i) {
-			if (modeCards[i].key === (selectedModeKey !== "" ? selectedModeKey : lastModeKey)) {
+			if (modeCards[i].key === (selectedModeKey !== "off" ? selectedModeKey : lastModeKey)) {
 				return modeCards[i].label
 			}
 		}
-		return "Power"
+		return qsTr("Idle")
 	}
+
 	// Short live status for the dial top: compact form of /StateText.
 	readonly property string ringStatusLabel: {
 		if (!stateText.valid) {
-			return "Idle " + selectedModeLabel
+			return qsTr("Idle")
 		}
 		switch (stateText.value) {
-			case "not connected":
-				return "Not connected"
-			case "fault":
-				return "Fault"
-			case "starting":
-			case "starting ventilation":
-				return "Starting"
-			case "warming up":
-				return "Warming up"
-			case "shutting down":
-			case "stopping ventilation":
-				return "Cooling down"
-			case "running":
-				if (showTemperatureControl) {
-					return "Heating to"
+		case "not connected":
+			return qsTr("Not connected")
+		case "fault":
+			return qsTr("Fault")
+		case "starting":
+		case "starting ventilation":
+			return qsTr("Starting")
+		case "warming up":
+			return qsTr("Warming up")
+		case "shutting down":
+		case "stopping ventilation":
+			return qsTr("Cooling down")
+		case "running":
+			if (showTemperatureControl) {
+				if (root.activeModeCardKey === "heat-ventilation") {
+					return qsTr("Heat & Airflow to")
 				}
-				if (showPowerControl) {
-					return "Heating level"
-				}
-				return "Running"
-			case "ventilation":
-				return "Only Ventilation"
-			case "off":
-				return "Idle " + selectedModeLabel
-			default:
-				return "Idle " + selectedModeLabel
+				return qsTr("Heating to")
+			}
+			if (showPowerControl) {
+				return qsTr("Heating level")
+			}
+			return qsTr("Running")
+		case "ventilation":
+			return qsTr("Only Ventilation")
+		case "off":
+			return root.selectedModeLabel
+		default:
+			return qsTr("Idle")
 		}
 	}
+
 	// Live status line: replaces the static description while the heater
 	// transitions or runs, showing real telemetry for the active mode.
 	readonly property string statusDescription: {
 		if (root.heaterDisconnected) {
-			return "Heater not connected."
+			return qsTr("Heater not connected.")
 		}
 		if (!stateText.valid) {
 			return activeModeDescription
 		}
 		const room = root.formatTemperatureValue(roomTemperature)
 		if (stateText.value === "not connected") {
-			return "Heater not connected."
+			return qsTr("Heater not connected.")
 		}
 		if (stateText.value === "fault") {
-			return errorText.valid && errorText.value !== "" ? errorText.value : "Heater fault."
+			return errorText.valid && errorText.value !== "" ? errorText.value : qsTr("Heater fault.")
 		}
 		if (stateText.value === "starting" || stateText.value === "starting ventilation") {
-			return "Starting heater..."
+			return qsTr("Starting heater...")
 		}
 		if (stateText.value === "warming up") {
-			return "Warming up..."
+			return qsTr("Warming up...")
 		}
 		if (stateText.value === "shutting down" || stateText.value === "stopping ventilation") {
-			return "Cooling down before stopping..."
+			return qsTr("Cooling down before stopping...")
 		}
 		if (stateText.value === "running") {
 			const target = targetTemperature.valid ? root.formatTemperatureValue(targetTemperature) : "--"
 			if (showPowerControl) {
 				const level = powerLevel.valid ? powerLevel.value : "--"
-				return "Running at power level " + level + " \u00B7 room " + room
+				return qsTr("Running at power level %1 · room is %2").arg(level).arg(room)
 			}
-			return "Heating to " + target + " \u00B7 room " + room
+			return qsTr("Heating to %1 · room is %2").arg(target).arg(room)
 		}
 		if (stateText.value === "ventilation") {
-			return "Ventilating \u00B7 room " + room
+			return qsTr("Ventilating · room is %1").arg(room)
 		}
 		return activeModeDescription
 	}
+
 	function clamp(value, minValue, maxValue) {
 		return Math.max(minValue, Math.min(maxValue, value))
 	}
@@ -209,29 +270,55 @@ SwipeViewPage {
 		}
 		return tabs
 	}
+
 	readonly property real ringValueRatio: {
-		if (showPowerControl && powerLevel.valid) {
-			return clamp(powerLevel.value / 9.0, 0.0, 1.0)
+		// Running: reflect actual heater mode; Idle: reflect preview chip (Temperature default)
+		if (isRunning) {
+			if (showPowerControl && powerLevel.valid) {
+				return clamp(powerLevel.value / 9.0, 0.0, 1.0)
+			}
+			if (showTemperatureControl && targetTemperature.valid) {
+				return clamp(targetTemperature.value / 30.0, 0.0, 1.0)
+			}
+		} else {
+			if (previewShowPowerControl && powerLevel.valid) {
+				return clamp(powerLevel.value / 9.0, 0.0, 1.0)
+			}
+			if (previewShowTemperatureControl && targetTemperature.valid) {
+				return clamp(targetTemperature.value / 30.0, 0.0, 1.0)
+			}
 		}
-		if (showTemperatureControl && targetTemperature.valid) {
-			return clamp((targetTemperature.value - 5.0) / 30.0, 0.0, 1.0)
-		}
-		return 1.0
+		return 0.0
 	}
-	readonly property bool canAdjustRingValue: showPowerControl
-		? powerLevel.valid
-		: (showTemperatureControl && targetTemperature.valid)
+
+	readonly property bool canAdjustRingValue: isRunning
+		? (showPowerControl ? powerLevel.valid : (showTemperatureControl && targetTemperature.valid))
+		: (previewShowPowerControl ? powerLevel.valid : (previewShowTemperatureControl && targetTemperature.valid))
+
 	// Current temperature shown as the dial caption: room temperature when a
 	// room source exists, otherwise the heater internal sensor.
 	readonly property var displayTemperatureItem: roomTemperature.valid
 		? roomTemperature
 		: (internalTemperature.valid ? internalTemperature : heaterTemperature)
+
 	// Big center value: the value the ring steppers set — target temperature
 	// in temperature modes, power level in power/ventilation modes.
 	// Temperature uses the same superscript unit style as the caption (number +
 	// raised °C/°F); power level has no unit.
+	// Running → actual mode; Idle Off → preview mode (Temperature default).
+	// Idle preview should show temp even without room sensor so Off doesn't
+	// look like a power value.
 	readonly property string ringPrimaryNumber: {
-		if (showPowerControl) {
+		if (isRunning) {
+			if (showPowerControl) {
+				return powerLevel.valid ? String(powerLevel.value) : "--"
+			}
+			if (targetTemperature.valid) {
+				return formatTemperatureNumber(targetTemperature)
+			}
+			return "--"
+		}
+		if (previewIsPowerForRing) {
 			return powerLevel.valid ? String(powerLevel.value) : "--"
 		}
 		if (targetTemperature.valid) {
@@ -239,8 +326,15 @@ SwipeViewPage {
 		}
 		return "--"
 	}
+
 	readonly property string ringPrimaryUnit: {
-		if (showPowerControl) {
+		if (isRunning) {
+			if (showPowerControl) {
+				return ""
+			}
+			return ringPrimaryNumber !== "--" && targetTemperature.valid ? Global.systemSettings.temperatureUnitSuffix : ""
+		}
+		if (previewIsPowerForRing) {
 			return ""
 		}
 		return ringPrimaryNumber !== "--" && targetTemperature.valid ? Global.systemSettings.temperatureUnitSuffix : ""
@@ -249,7 +343,7 @@ SwipeViewPage {
 	topLeftButton: VenusOS.StatusBar_LeftButton_ControlsInactive
 	fullScreenWhenIdle: true
 	focusPolicy: Qt.TabFocus
-	navButtonText: "Heater"
+	navButtonText: qsTr("Heater")
 	navButtonIcon: heaterIcon
 	url: Qt.resolvedUrl("HeaterPage.qml")
 
@@ -269,9 +363,9 @@ SwipeViewPage {
 			horizontalCenter: parent.horizontalCenter
 		}
 		opacity: Global.pageManager?.interactivity === VenusOS.PageManager_InteractionMode_Interactive
-				 || Global.pageManager?.interactivity === VenusOS.PageManager_InteractionMode_ExitIdleMode
-				 ? 1.0
-				 : 0.0
+			|| Global.pageManager?.interactivity === VenusOS.PageManager_InteractionMode_ExitIdleMode
+			? 1.0
+			: 0.0
 
 		Behavior on opacity {
 			enabled: root.animationEnabled && root.isCurrentPage
@@ -280,7 +374,10 @@ SwipeViewPage {
 
 		Behavior on anchors.topMargin {
 			enabled: root.animationEnabled && root.isCurrentPage
-			NumberAnimation { duration: Theme.animation_page_idleResize_duration; easing.type: Easing.InOutQuad }
+			NumberAnimation {
+				duration: Theme.animation_page_idleResize_duration
+				easing.type: Easing.InOutQuad
+			}
 		}
 
 		model: root.tabModel
@@ -295,8 +392,6 @@ SwipeViewPage {
 		id: themeBlueProbe
 		visible: false
 	}
-
-
 
 	FocusScope {
 		id: contentScope
@@ -371,8 +466,8 @@ SwipeViewPage {
 								height: width
 								anchors {
 									top: parent.top
-									horizontalCenter: parent.horizontalCenter
 									topMargin: 0
+									horizontalCenter: parent.horizontalCenter
 								}
 
 								valueRatio: root.ringValueRatio
@@ -399,7 +494,7 @@ SwipeViewPage {
 
 									Button {
 										anchors.fill: parent
-										text: "\u2013"
+										text: "–"
 										enabled: root.canAdjustRingValue && root.dialEnabled
 										font.pixelSize: Theme.font_size_h2 - 5
 										color: Theme.color_font_secondary
@@ -452,7 +547,6 @@ SwipeViewPage {
 							width: modeBlockRow.width
 							height: modeBlockRow.height
 
-
 							Row {
 								id: modeBlockRow
 								spacing: 12
@@ -460,31 +554,39 @@ SwipeViewPage {
 
 								Button {
 									id: powerChipButton
+									// Off is the default state: active when "off" is selected OR nothing is selected.
+									// flat: false is required, otherwise backgroundColor is ignored.
+									flat: false
 									height: 50
 									width: 50
-
 									text: ""
-									flat: false
-									backgroundColor: root.selectedModeKey === "" ? Qt.alpha(Theme.color_blue, 0.5) : Theme.color_gray1
-									borderColor: root.selectedModeKey === "" ? Qt.alpha(Theme.color_blue, 0.5) : Theme.color_gray1
-									color: Theme.color_white
+
+									readonly property bool isDisabled: !root.hasHeater || root.heaterDisconnected
+									readonly property bool offActive: !isDisabled
+										&& (root.selectedModeKey === "off" || root.selectedModeKey === "")
+
+									enabled: !isDisabled
+									backgroundColor: offActive ? Theme.color_blue : Theme.color_gray1
+									borderColor: offActive ? Theme.color_blue : Theme.color_gray1
+									color: isDisabled ? Theme.color_font_secondary : Theme.color_white
+									opacity: isDisabled ? 0.5 : 1.0
 
 									onClicked: {
 										if (root.isRunning) {
-											if (root.selectedModeKey !== "") {
+											if (root.selectedModeKey !== "off") {
 												root.lastModeKey = root.selectedModeKey
 											}
 											root.selectedModeKey = ""
 											root.dialEnabled = false
 											Global.dialogLayer.open(startStopDialogComponent, {
-												startRequested: false,
+												startRequested: false
 											})
 											return
 										}
-										if (root.selectedModeKey !== "") {
+										if (root.selectedModeKey !== "off") {
 											root.lastModeKey = root.selectedModeKey
 										}
-										root.selectedModeKey = ""
+										root.selectedModeKey = "off"
 										root.dialEnabled = false
 									}
 
@@ -494,7 +596,7 @@ SwipeViewPage {
 										height: 22
 										source: root.powerIcon
 										fillMode: Image.PreserveAspectFit
-										color: Theme.color_white
+										color: powerChipButton.isDisabled ? Theme.color_font_secondary : Theme.color_white
 									}
 								}
 
@@ -508,18 +610,30 @@ SwipeViewPage {
 
 										readonly property bool active: modelData.key === root.selectedModeKey
 										readonly property bool roomSensorMode: modelData.modeValue === 1 || modelData.modeValue === 3
+										readonly property bool isHeatingMode: modelData.modeValue === 0 || modelData.modeValue === 1 || modelData.modeValue === 3
+										readonly property bool isVentilationFamily: modelData.modeValue === 2
 										readonly property bool supported: modelData.modeValue >= 0
-										readonly property bool selectable: supported
+										readonly property bool noHeater: !root.hasHeater
+										readonly property bool disconnected: root.heaterDisconnected
+										readonly property bool familyLocked: (root.ventilationLocked && chipButton.isVentilationFamily)
+											|| (root.heatingLocked && chipButton.isHeatingMode)
+										readonly property bool isDisabled: chipButton.noHeater || chipButton.disconnected
+											|| chipButton.familyLocked || !chipButton.supported
+										readonly property bool selectable: chipButton.supported && !chipButton.familyLocked
+											&& !chipButton.noHeater && !chipButton.disconnected
 
 										height: 50
 										width: 50
-
 										text: ""
 										flat: false
-										enabled: selectable && !root.heaterDisconnected
-										backgroundColor: active ? Theme.color_blue : Theme.color_gray1
-										borderColor: active ? Theme.color_blue : Theme.color_gray1
-										color: (chipButton.selectable && !root.heaterDisconnected) ? Theme.color_white : Theme.color_font_secondary
+										enabled: chipButton.selectable
+										backgroundColor: chipButton.isDisabled ? Theme.color_gray1
+											: (active ? Theme.color_blue : Theme.color_gray1)
+										borderColor: chipButton.isDisabled ? Theme.color_gray1
+											: (active ? Theme.color_blue : Theme.color_gray1)
+										color: chipButton.isDisabled ? Theme.color_font_secondary : Theme.color_white
+										opacity: chipButton.isDisabled ? 0.5
+											: (chipButton.familyLocked ? 0.35 : 1.0)
 
 										onClicked: {
 											root.selectedModeKey = modelData.key
@@ -534,7 +648,7 @@ SwipeViewPage {
 											height: 22
 											source: chipButton.modelData.icon
 											fillMode: Image.PreserveAspectFit
-											color: Theme.color_white
+											color: chipButton.isDisabled ? Theme.color_font_secondary : Theme.color_white
 										}
 									}
 								}
@@ -566,47 +680,70 @@ SwipeViewPage {
 									icon: "qrc:/images/icon_propeller.svg",
 									iconSize: 20,
 									label: qsTr("Fan"),
-									value: root.heaterDisconnected ? "--" : (fanRpmActual.valid ? fanRpmActual.value + " " + qsTr("RPM") : "--"),
-									valueColor: root.heaterDisconnected ? Qt.alpha(Theme.color_font_primary, 0.5) : Theme.color_font_primary,
-									iconColor: root.heaterDisconnected ? Qt.alpha(Theme.color_font_secondary, 0.5) : Theme.color_font_secondary
+									value: root.heaterDisconnected ? "--"
+										: (fanRpmActual.valid ? fanRpmActual.value + " " + qsTr("RPM") : "--"),
+									valueColor: root.heaterDisconnected
+										? Qt.alpha(Theme.color_font_primary, 0.5)
+										: Theme.color_font_primary,
+									iconColor: root.heaterDisconnected
+										? Qt.alpha(Theme.color_font_secondary, 0.5)
+										: Theme.color_font_secondary
 								},
 								{
 									icon: "qrc:/images/icon_engine_temp_32.svg",
 									label: qsTr("Heater temp."),
-									value: root.heaterDisconnected ? "--" : (heaterTemperature.valid ? heaterTemperature.value + "\u00B0C" : "--"),
-									valueColor: root.heaterDisconnected ? Qt.alpha(Theme.color_font_primary, 0.5) : Theme.color_font_primary,
-									iconColor: root.heaterDisconnected ? Qt.alpha(Theme.color_font_secondary, 0.5) : Theme.color_font_secondary
+									value: root.heaterDisconnected ? "--"
+										: (heaterTemperature.valid ? heaterTemperature.value + "°C" : "--"),
+									valueColor: root.heaterDisconnected
+										? Qt.alpha(Theme.color_font_primary, 0.5)
+										: Theme.color_font_primary,
+									iconColor: root.heaterDisconnected
+										? Qt.alpha(Theme.color_font_secondary, 0.5)
+										: Theme.color_font_secondary
 								},
 								{
 									icon: "qrc:/images/icon_temp_32.svg",
 									label: qsTr("Room temp."),
 									value: roomTemperature.valid
 										? root.formatTemperatureValue(roomTemperature)
-										: (internalTemperature.valid ? internalTemperature.value + "\u00B0C" : "--"),
+										: (internalTemperature.valid ? internalTemperature.value + "°C" : "--"),
 									valueColor: Theme.color_font_primary,
 									iconColor: Theme.color_font_secondary
 								},
 								{
 									icon: "qrc:/images/icon_temp_32.svg",
 									label: qsTr("Internal temp."),
-									value: root.heaterDisconnected ? "--" : (internalTemperature.valid ? internalTemperature.value + "\u00B0C" : "--"),
-									valueColor: root.heaterDisconnected ? Qt.alpha(Theme.color_font_primary, 0.5) : Theme.color_font_primary,
-									iconColor: root.heaterDisconnected ? Qt.alpha(Theme.color_font_secondary, 0.5) : Theme.color_font_secondary
+									value: root.heaterDisconnected ? "--"
+										: (internalTemperature.valid ? internalTemperature.value + "°C" : "--"),
+									valueColor: root.heaterDisconnected
+										? Qt.alpha(Theme.color_font_primary, 0.5)
+										: Theme.color_font_primary,
+									iconColor: root.heaterDisconnected
+										? Qt.alpha(Theme.color_font_secondary, 0.5)
+										: Theme.color_font_secondary
 								},
 								{
 									icon: root.heaterDisconnected ? root.alertIcon : "qrc:/images/icon_checkmark_32.svg",
 									valueBold: false,
 									label: qsTr("Status"),
-									value: root.heaterDisconnected ? qsTr("Disconnected") : ((errorCode.valid && errorCode.value !== 0) ? qsTr("Error") : qsTr("OK")),
-									valueColor: root.heaterDisconnected ? Qt.alpha(Theme.color_font_primary, 0.5) : Theme.color_font_primary,
+									value: root.heaterDisconnected ? qsTr("Disconnected")
+										: ((errorCode.valid && errorCode.value !== 0) ? qsTr("Error") : qsTr("OK")),
+									valueColor: root.heaterDisconnected
+										? Qt.alpha(Theme.color_font_primary, 0.5)
+										: Theme.color_font_primary,
 									iconColor: root.heaterDisconnected ? Theme.color_red : Theme.color_green
 								},
 								{
 									icon: root.pumpIcon,
 									label: qsTr("Fuel pump freq."),
-									value: root.heaterDisconnected ? "--" : (fuelPumpFrequency.valid ? fuelPumpFrequency.value.toFixed(1) + " " + qsTr("Hz") : "--"),
-									valueColor: root.heaterDisconnected ? Qt.alpha(Theme.color_font_primary, 0.5) : Theme.color_font_primary,
-									iconColor: root.heaterDisconnected ? Qt.alpha(Theme.color_font_secondary, 0.5) : Theme.color_font_secondary
+									value: root.heaterDisconnected ? "--"
+										: (fuelPumpFrequency.valid ? fuelPumpFrequency.value.toFixed(1) + " " + qsTr("Hz") : "--"),
+									valueColor: root.heaterDisconnected
+										? Qt.alpha(Theme.color_font_primary, 0.5)
+										: Theme.color_font_primary,
+									iconColor: root.heaterDisconnected
+										? Qt.alpha(Theme.color_font_secondary, 0.5)
+										: Theme.color_font_secondary
 								}
 							]
 
@@ -669,7 +806,6 @@ SwipeViewPage {
 							}
 						}
 
-
 						Rectangle {
 							id: statusCard
 
@@ -682,7 +818,6 @@ SwipeViewPage {
 							height: 93
 							radius: 8
 							color: "transparent"
-
 
 							Row {
 								anchors {
@@ -717,7 +852,6 @@ SwipeViewPage {
 
 						Button {
 							id: actionButton
-								opacity: enabled ? 1.0 : 0.5
 
 							anchors {
 								left: parent.left
@@ -726,8 +860,10 @@ SwipeViewPage {
 								topMargin: 5
 							}
 							height: 52
+							opacity: enabled ? 1.0 : 0.5
 							text: root.actionLabel
-							enabled: startStop.valid && !root.isTransitioning && (root.selectedModeKey !== "" || root.isRunning)
+							enabled: startStop.valid && !root.isTransitioning
+								&& (root.selectedModeKey !== "" || root.isRunning)
 							flat: false
 							backgroundColor: root.pendingStartStopAction === "start"
 								? Theme.color_darkBlue
@@ -743,7 +879,7 @@ SwipeViewPage {
 							font.pixelSize: Theme.font_size_body1
 							font.bold: true
 							onClicked: Global.dialogLayer.open(startStopDialogComponent, {
-								startRequested: !root.isRunning,
+								startRequested: !root.isRunning
 							})
 						}
 					}
@@ -752,32 +888,86 @@ SwipeViewPage {
 		}
 	}
 
-	VeQuickItem { id: stateText; uid: root.bindPrefix + "/StateText" }
-	VeQuickItem { id: errorText; uid: root.bindPrefix + "/ErrorText" }
-	VeQuickItem { id: errorCode; uid: root.bindPrefix + "/ErrorCode" }
-	VeQuickItem { id: mode; uid: root.bindPrefix + "/Mode" }
-	VeQuickItem { id: heaterState; uid: root.bindPrefix + "/State" }
-	VeQuickItem { id: startStop; uid: root.bindPrefix + "/StartStop" }
-	VeQuickItem { id: roomTemperatureControl; uid: root.bindPrefix + "/Capabilities/RoomTemperatureControl" }
-	VeQuickItem { id: roomTemperature; uid: root.bindPrefix + "/Temperatures/Room" }
-	VeQuickItem { id: targetTemperature; uid: root.bindPrefix + "/Settings/TargetTemperature" }
-	VeQuickItem { id: powerLevel; uid: root.bindPrefix + "/Settings/PowerLevel" }
+	VeQuickItem {
+		id: stateText
+		uid: root.bindPrefix + "/StateText"
+	}
+	VeQuickItem {
+		id: errorText
+		uid: root.bindPrefix + "/ErrorText"
+	}
+	VeQuickItem {
+		id: errorCode
+		uid: root.bindPrefix + "/ErrorCode"
+	}
+	VeQuickItem {
+		id: mode
+		uid: root.bindPrefix + "/Mode"
+	}
+	VeQuickItem {
+		id: heaterState
+		uid: root.bindPrefix + "/State"
+	}
+	VeQuickItem {
+		id: startStop
+		uid: root.bindPrefix + "/StartStop"
+	}
+	VeQuickItem {
+		id: roomTemperatureControl
+		uid: root.bindPrefix + "/Capabilities/RoomTemperatureControl"
+	}
+	VeQuickItem {
+		id: roomTemperature
+		uid: root.bindPrefix + "/Temperatures/Room"
+	}
+	VeQuickItem {
+		id: targetTemperature
+		uid: root.bindPrefix + "/Settings/TargetTemperature"
+	}
+	VeQuickItem {
+		id: powerLevel
+		uid: root.bindPrefix + "/Settings/PowerLevel"
+	}
+
 	// Live telemetry data
-	VeQuickItem { id: batteryVoltage; uid: root.bindPrefix + "/Dc/0/Voltage" }
-	VeQuickItem { id: fanRpmSet; uid: root.bindPrefix + "/Status/FanRpmSet" }
-	VeQuickItem { id: fanRpmActual; uid: root.bindPrefix + "/Status/FanRpmActual" }
-	VeQuickItem { id: heaterTemperature; uid: root.bindPrefix + "/Temperatures/Heater" }
-	VeQuickItem { id: internalTemperature; uid: root.bindPrefix + "/Temperatures/Internal" }
-	VeQuickItem { id: fuelPumpFrequency; uid: root.bindPrefix + "/Status/FuelPumpFrequency" }
-	VeQuickItem { id: communicationAlarm; uid: root.bindPrefix + "/Alarms/Communication" }
+	VeQuickItem {
+		id: batteryVoltage
+		uid: root.bindPrefix + "/Dc/0/Voltage"
+	}
+	VeQuickItem {
+		id: fanRpmSet
+		uid: root.bindPrefix + "/Status/FanRpmSet"
+	}
+	VeQuickItem {
+		id: fanRpmActual
+		uid: root.bindPrefix + "/Status/FanRpmActual"
+	}
+	VeQuickItem {
+		id: heaterTemperature
+		uid: root.bindPrefix + "/Temperatures/Heater"
+	}
+	VeQuickItem {
+		id: internalTemperature
+		uid: root.bindPrefix + "/Temperatures/Internal"
+	}
+	VeQuickItem {
+		id: fuelPumpFrequency
+		uid: root.bindPrefix + "/Status/FuelPumpFrequency"
+	}
+	VeQuickItem {
+		id: communicationAlarm
+		uid: root.bindPrefix + "/Alarms/Communication"
+	}
 
 	Connections {
 		target: heaterState
 
 		function onValueChanged() {
-			if (root.pendingStartStopAction === "start" && (heaterState.value === 3 || heaterState.value === 0 || heaterState.value === 10)) {
+			if (root.pendingStartStopAction === "start"
+				&& (heaterState.value === 3 || heaterState.value === 0 || heaterState.value === 10)) {
 				root.pendingStartStopAction = ""
-			} else if (root.pendingStartStopAction === "stop" && (heaterState.value === 0 || heaterState.value === 10)) {
+			} else if (root.pendingStartStopAction === "stop"
+				&& (heaterState.value === 0 || heaterState.value === 10)) {
 				root.pendingStartStopAction = ""
 			}
 		}
@@ -809,10 +999,10 @@ SwipeViewPage {
 			required property int requestedModeValue
 			required property string requestedModeLabel
 
-			title: "Change mode?"
-			description: "The heater is running. Switch to " + requestedModeLabel + " now?"
+			title: qsTr("Change mode?")
+			description: qsTr("The heater is running. Switch to %1 now?").arg(requestedModeLabel)
 			dialogDoneOptions: VenusOS.ModalDialog_DoneOptions_OkAndCancel
-			acceptText: "Change mode"
+			acceptText: qsTr("Change mode")
 			onClosed: {
 				if (result === T.Dialog.Accepted) {
 					root.selectMode(requestedModeValue)
@@ -827,7 +1017,7 @@ SwipeViewPage {
 			return
 		}
 		if (showTemperatureControl && targetTemperature.valid) {
-			targetTemperature.setValue(clamp(targetTemperature.value + delta, 5, 35))
+			targetTemperature.setValue(clamp(targetTemperature.value + delta, 0, 30))
 		}
 	}
 
@@ -837,6 +1027,15 @@ SwipeViewPage {
 		}
 		if ((modeValue === 1 || modeValue === 3) && !hasRoomTemperatureControl) {
 			return
+		}
+		// Manual p11-12: block cross-family via D-Bus while running.
+		if (isRunning) {
+			const wantVentilation = modeValue === 2
+			const runningHeating = !isVentilationMode
+			const runningVentilation = isVentilationMode
+			if ((wantVentilation && runningHeating) || (!wantVentilation && runningVentilation)) {
+				return
+			}
 		}
 		mode.setValue(modeValue)
 	}
@@ -848,10 +1047,17 @@ SwipeViewPage {
 		if ((modeValue === 1 || modeValue === 3) && !hasRoomTemperatureControl) {
 			return
 		}
+		// Manual p11-12: reject cross-family switch while running (defense-in-depth).
+		const wantVentilation = modeValue === 2
+		const runningHeating = isRunning && !isVentilationMode
+		const runningVentilation = isRunning && isVentilationMode
+		if ((wantVentilation && runningHeating) || (!wantVentilation && runningVentilation)) {
+			return
+		}
 		if (isRunning) {
 			Global.dialogLayer.open(modeChangeDialogComponent, {
 				requestedModeValue: modeValue,
-				requestedModeLabel: modeLabel,
+				requestedModeLabel: modeLabel
 			})
 			return
 		}

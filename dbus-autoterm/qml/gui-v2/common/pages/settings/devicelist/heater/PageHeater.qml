@@ -126,8 +126,8 @@ DevicePage {
 			dataItem.uid: root.bindPrefix + "/Settings/TargetTemperature"
 			preferredVisible: root.showTemperatureControl
 			suffix: Units.defaultUnitString(Global.systemSettings.temperatureUnit)
-			from: 5
-			to: 35
+			from: 0
+			to: 30
 			stepSize: 1
 		}
 
