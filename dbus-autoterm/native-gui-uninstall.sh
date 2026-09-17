@@ -16,6 +16,8 @@ ADDED_FILES=(
     "images/heater_bottom_bar.svg"
     "images/icon_flame.svg"
     "images/icon_fan_clock.svg"
+    "images/icon_timer_minus.svg"
+    "images/icon_timer_plus.svg"
     "images/icon_timer_remove.svg"
     "pages/HeaterPage.qml"
 )

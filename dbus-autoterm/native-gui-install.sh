@@ -21,6 +21,8 @@ ADDED_FILES=(
     "images/icon_pump.svg"
     "images/icon_alert.svg"
     "images/icon_fan_clock.svg"
+    "images/icon_timer_minus.svg"
+    "images/icon_timer_plus.svg"
     "images/icon_timer_remove.svg"
     "pages/CircularHeaterRing.qml"
     "pages/HeaterPage.qml"
