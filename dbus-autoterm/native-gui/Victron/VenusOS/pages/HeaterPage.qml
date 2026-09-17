@@ -914,7 +914,8 @@ SwipeViewPage {
 									{
 										icon: root.fanClockIcon,
 										label: qsTr("Timer"),
-										value: root.timerDisplayText,
+										value: (root.timerSelectedMinutes <= 0 && !root.timerRunning) ? "--"
+											: root.timerDisplayText + " " + qsTr("min"),
 										valueColor: Theme.color_font_primary,
 										iconColor: Theme.color_font_secondary
 									},
