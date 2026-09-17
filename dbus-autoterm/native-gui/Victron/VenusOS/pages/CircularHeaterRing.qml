@@ -10,7 +10,6 @@ Item {
 	property color progressColor: Theme.color_blue
 	property color remainderColor: Theme.color_gray1
 	property color centerFillColor: Qt.rgba(0, 0, 0, 0.18)
-	property color centerStrokeColor: Theme.color_gray1
 	property color primaryValueColor: Theme.color_font_primary
 	property color secondaryValueColor: Theme.color_listItem_secondaryText
 	property color captionValueColor: Theme.color_listItem_secondaryText
@@ -56,12 +55,12 @@ Item {
 			anchors.centerIn: parent
 			radius: width / 2
 			color: root.centerFillColor
-			border.width: 1
-			border.color: root.centerStrokeColor
+			border.width: 0
+			border.color: "transparent"
 
 			Column {
 				anchors.centerIn: parent
-				spacing: 6
+				spacing: 4
 
 				// Active mode, right above the big value
 				Label {
