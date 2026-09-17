@@ -468,7 +468,7 @@ SwipeViewPage {
 
 				// When the bottom navigation bar hides (idle/full-screen), slide the mode
 				// chips and the start button block down to reclaim some of the freed space.
-				readonly property real bottomShift: (Global.pageManager && Global.pageManager.expandLayout) ? 40 : 0
+				property real bottomShift: (Global.pageManager && Global.pageManager.expandLayout) ? 40 : 0
 				Behavior on bottomShift {
 					enabled: root.animationEnabled && root.isCurrentPage
 					NumberAnimation {
