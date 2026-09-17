@@ -466,6 +466,17 @@ SwipeViewPage {
 			delegate: Item {
 				required property var modelData
 
+				// When the bottom navigation bar hides (idle/full-screen), slide the mode
+				// chips and the start button block down to reclaim some of the freed space.
+				readonly property real bottomShift: (Global.pageManager && Global.pageManager.expandLayout) ? 40 : 0
+				Behavior on bottomShift {
+					enabled: root.animationEnabled && root.isCurrentPage
+					NumberAnimation {
+						duration: Theme.animation_page_idleResize_duration
+						easing.type: Easing.InOutQuad
+					}
+				}
+
 				width: heaterTab.width
 				height: heaterTab.height
 
@@ -574,7 +585,7 @@ SwipeViewPage {
 
 							anchors {
 								top: dialArea.bottom
-								topMargin: 12
+								topMargin: 12 + bottomShift
 								horizontalCenter: parent.horizontalCenter
 							}
 							width: modeBlockRow.width
@@ -1067,15 +1078,16 @@ SwipeViewPage {
 						Button {
 							id: actionButton
 
-							// Bottom-aligned with the left column mode chips (chips sit at 342px from
-							// the column top: dialArea 280 + topMargin 12 + chip height 50). Both
-							// columns share the same top/height, so this tracks the chips regardless
-							// of page height or whether the bottom navbar is shown.
+						// Bottom-aligned with the left column mode chips (chips sit at 342px from
+						// the column top: dialArea 280 + topMargin 12 + chip height 50). Both
+						// columns share the same top/height, so this tracks the chips regardless
+						// of page height; when the bottom navbar hides, both slide down by
+						// bottomShift to reclaim some of the freed space.
 							anchors {
 								left: parent.left
 								right: parent.right
 								bottom: parent.bottom
-								bottomMargin: parent.height - 342
+								bottomMargin: parent.height - 342 - bottomShift
 							}
 							height: 52
 							opacity: enabled ? 1.0 : 0.5
