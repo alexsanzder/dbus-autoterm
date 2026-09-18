@@ -130,13 +130,6 @@ DevicePage {
 			optionModel: root.timerOptions
 		}
 
-		ListNavigation {
-			text: "Timer settings"
-			onClicked: Global.pageManager.pushPage("/pages/settings/devicelist/heater/PageHeaterTimerSettings.qml", {
-				bindPrefix: root.bindPrefix,
-			})
-		}
-
 		ListRadioButtonGroup {
 			text: "Mode"
 			dataItem.uid: root.bindPrefix + "/Mode"
@@ -253,6 +246,13 @@ DevicePage {
 		}
 
 		ListNavigation {
+			text: "Timer settings"
+			onClicked: Global.pageManager.pushPage("/pages/settings/devicelist/heater/PageHeaterTimerSettings.qml", {
+				bindPrefix: root.bindPrefix,
+			})
+		}
+
+		ListNavigation {
 			text: "Heater settings"
 			onClicked: Global.pageManager.pushPage("/pages/settings/devicelist/heater/PageHeaterSettings.qml", {
 				bindPrefix: root.bindPrefix,
@@ -307,17 +307,17 @@ DevicePage {
 
 	VeQuickItem {
 		id: timerPreset0
-		uid: root.bindPrefix + "/Settings/Timer/Preset/0"
+		uid: root.bindPrefix + "/Settings/Timer/Preset/3"
 	}
 
 	VeQuickItem {
 		id: timerPreset1
-		uid: root.bindPrefix + "/Settings/Timer/Preset/1"
+		uid: root.bindPrefix + "/Settings/Timer/Preset/4"
 	}
 
 	VeQuickItem {
 		id: timerPreset2
-		uid: root.bindPrefix + "/Settings/Timer/Preset/2"
+		uid: root.bindPrefix + "/Settings/Timer/Preset/5"
 	}
 
 	Component {

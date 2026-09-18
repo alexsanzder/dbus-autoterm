@@ -28,9 +28,11 @@ SwipeViewPage {
 	readonly property int timerSelectedMinutes: backendTimerDuration.valid ? backendTimerDuration.value : 0
 	readonly property int timerRemainingSeconds: backendTimerRemaining.valid ? backendTimerRemaining.value : 0
 	readonly property bool timerRunning: root.isRunning && root.timerRemainingSeconds > 0
-	readonly property var timerStepMinutes: [5, 15, 30]
-	readonly property var timerPresetMinutes: backendTimerPreset0.valid
+	readonly property var timerStepMinutes: backendTimerPreset0.valid
 		? [backendTimerPreset0.value, backendTimerPreset1.value, backendTimerPreset2.value]
+		: [5, 15, 30]
+	readonly property var timerPresetMinutes: backendTimerPreset3.valid
+		? [backendTimerPreset3.value, backendTimerPreset4.value, backendTimerPreset5.value]
 		: [30, 60, 90]
 	readonly property string timerDisplayText: {
 		const total = timerRemainingSeconds
@@ -795,6 +797,13 @@ SwipeViewPage {
 										color: Theme.color_white
 										text: root.timerDisplayText
 										opacity: (root.hasHeater && !root.heaterDisconnected && root.timerPanelEnabled) ? 1.0 : 0.5
+
+										MouseArea {
+											anchors.fill: parent
+											anchors.margins: -12
+											enabled: root.hasHeater && !root.heaterDisconnected && root.timerPanelEnabled
+											onClicked: Global.dialogLayer.open(timerPresetsDialogComponent)
+										}
 									}
 
 									Button {
@@ -1220,6 +1229,21 @@ SwipeViewPage {
 		uid: root.bindPrefix + "/Settings/Timer/Preset/2"
 	}
 
+	VeQuickItem {
+		id: backendTimerPreset3
+		uid: root.bindPrefix + "/Settings/Timer/Preset/3"
+	}
+
+	VeQuickItem {
+		id: backendTimerPreset4
+		uid: root.bindPrefix + "/Settings/Timer/Preset/4"
+	}
+
+	VeQuickItem {
+		id: backendTimerPreset5
+		uid: root.bindPrefix + "/Settings/Timer/Preset/5"
+	}
+
 	// Countdown ticking, expiry auto-stop and freeze-on-stop are owned by the
 	// driver; the UI only reads /Timer/RemainingSeconds.
 
@@ -1290,6 +1314,79 @@ SwipeViewPage {
 				if (result === T.Dialog.Accepted) {
 					root.resetTimer()
 				}
+			}
+		}
+	}
+
+	// Timer setter dialog: shows the armed duration as --:-- (h:mm:ss) with
+	// +/- stepping; openable whether or not the timer or heater is running.
+	Component {
+		id: timerPresetsDialogComponent
+
+		ModalDialog {
+			id: timerDialog
+
+			property int minutes: Math.max(0, root.timerSelectedMinutes)
+			readonly property string timeText: {
+				if (minutes <= 0) {
+					return "--:--"
+				}
+				const total = minutes * 60
+				const pad = function(n) { return String(n).padStart(2, "0") }
+				const hours = Math.floor(total / 3600)
+				return (hours > 0 ? pad(hours) + ":" : "") + pad(Math.floor((total % 3600) / 60)) + ":00"
+			}
+
+			title: qsTr("Set timer")
+			dialogDoneOptions: VenusOS.ModalDialog_DoneOptions_SetAndCancel
+			acceptText: qsTr("Set")
+
+			contentItem: ModalDialog.FocusableContentItem {
+				Row {
+					anchors.centerIn: parent
+					spacing: Theme.geometry_listItem_content_spacing * 2
+
+					Button {
+						anchors.verticalCenter: parent.verticalCenter
+						width: 64
+						height: 64
+						text: "−"
+						font.pixelSize: Theme.font_size_h2
+						flat: false
+						backgroundColor: Theme.color_blue
+						borderColor: Theme.color_blue
+						enabled: timerDialog.minutes > 0
+						opacity: enabled ? 1.0 : 0.5
+						onClicked: timerDialog.minutes = timerDialog.minutes <= 30 ? 0 : timerDialog.minutes - 5
+					}
+
+					Label {
+						anchors.verticalCenter: parent.verticalCenter
+						text: timerDialog.timeText
+						font.pixelSize: Theme.font_size_h1 * root.primaryValueFontScale
+						color: Theme.color_white
+					}
+
+					Button {
+						anchors.verticalCenter: parent.verticalCenter
+						width: 64
+						height: 64
+						text: "+"
+						font.pixelSize: Theme.font_size_h2
+						flat: false
+						backgroundColor: Theme.color_blue
+						borderColor: Theme.color_blue
+						enabled: timerDialog.minutes < 720
+						opacity: enabled ? 1.0 : 0.5
+						onClicked: timerDialog.minutes = Math.min(720, timerDialog.minutes === 0 ? 30 : timerDialog.minutes + 5)
+					}
+				}
+			}
+
+			onAccepted: {
+				// Direct write: unlike the preset buttons, Set must not
+				// toggle the timer off when the value is unchanged.
+				backendTimerDuration.setValue(timerDialog.minutes)
 			}
 		}
 	}

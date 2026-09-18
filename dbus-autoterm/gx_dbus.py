@@ -182,7 +182,11 @@ class HeaterDbusAdapter:
         self._timers = [HeaterTimerEntry() for _ in range(3)]
         self._timer_duration_minutes = 0
         self._timer_deadline: float | None = None
-        self._timer_presets = [max(30, min(720, int(minutes))) for minutes in (timer_presets or [30, 60, 90])]
+        # Indices 0-2 are the HeaterPage "+minutes" steps, 3-5 the preset durations.
+        self._timer_presets = [
+            max(5 if index < 3 else 30, min(720, int(minutes)))
+            for index, minutes in enumerate(timer_presets or [5, 15, 30, 30, 60, 90])
+        ]
         self._on_timer_preset_change: Callable[[int, int], bool] | None = None
         # Per-mode stepper memories (Comfort Control p10-12): Power and
         # Ventilation keep independent power levels; Temperature and
@@ -403,10 +407,10 @@ class HeaterDbusAdapter:
             self.service.add_path(f"{prefix}/Mode", self._timers[index].mode, writeable=True, onchangecallback=self._timer_callback(index, "mode", int(HeaterUiMode.POWER), int(HeaterUiMode.HEAT_VENTILATION)))
             self.service.add_path(f"{prefix}/TargetTemperature", self._timers[index].target_temperature, writeable=True, onchangecallback=self._timer_callback(index, "target_temperature", 0, 30))
             self.service.add_path(f"{prefix}/PowerLevel", self._timers[index].power_level, writeable=True, onchangecallback=self._timer_callback(index, "power_level", 1, 9))
-        self.service.add_path("/Timer/DurationMinutes", 0, writeable=True, onchangecallback=self._handle_timer_duration_change)
-        self.service.add_path("/Timer/RemainingSeconds", 0)
+        self.service.add_path("/Timer/DurationMinutes", 0, writeable=True, onchangecallback=self._handle_timer_duration_change, valuetype=int)
+        self.service.add_path("/Timer/RemainingSeconds", 0, valuetype=int)
         for index in range(len(self._timer_presets)):
-            self.service.add_path(f"/Settings/Timer/Preset/{index}", self._timer_presets[index], writeable=True, onchangecallback=self._handle_timer_preset_change(index))
+            self.service.add_path(f"/Settings/Timer/Preset/{index}", self._timer_presets[index], writeable=True, onchangecallback=self._handle_timer_preset_change(index), valuetype=int)
         self.service.register()
 
     def _handle_startstop(self, path: str, value: object) -> bool:
@@ -476,7 +480,7 @@ class HeaterDbusAdapter:
                 minutes = int(value)
             except (TypeError, ValueError):
                 return False
-            minutes = max(30, min(720, minutes))
+            minutes = max(5 if index < 3 else 30, min(720, minutes))
             self._timer_presets[index] = minutes
             if self._on_timer_preset_change is not None and not self._on_timer_preset_change(index, minutes):
                 return False

@@ -32,7 +32,7 @@ class RuntimeConfig:
     poll_interval: float = 1.0
     log_level: str = "INFO"
     mock_dbus: bool = False
-    timer_presets: tuple[int, int, int] = (30, 60, 90)
+    timer_presets: tuple[int, ...] = (5, 15, 30, 30, 60, 90)
     driver_config: DriverConfig = field(default_factory=DriverConfig)
 
 
@@ -238,9 +238,12 @@ def _build_runtime_config(args: argparse.Namespace, arg_list: list[str], config:
     )
     mock_dbus = args.mock_dbus or _config_getboolean(config, "driver", "mock_dbus", False)
     timer_presets = (
-        _config_getint(config, "timer", "preset0", 30),
-        _config_getint(config, "timer", "preset1", 60),
-        _config_getint(config, "timer", "preset2", 90),
+        _config_getint(config, "timer", "preset0", 5),
+        _config_getint(config, "timer", "preset1", 15),
+        _config_getint(config, "timer", "preset2", 30),
+        _config_getint(config, "timer", "preset3", 30),
+        _config_getint(config, "timer", "preset4", 60),
+        _config_getint(config, "timer", "preset5", 90),
     )
     driver_config = DriverConfig(
         service_name=args.service_name or _config_get(config, "dbus", "service_name", DriverConfig.service_name),
