@@ -22,15 +22,18 @@ SwipeViewPage {
 	property int rightTabIndex: 0
 	property real primaryValueFontScale: 1.5
 
-	// Timer tab state (UI-only until the backend timer paths are wired).
-	// Duration range per Comfort Control manual: 30-720 min in 5-min steps.
-	property int timerSelectedMinutes: 0
-	property int timerRemainingSeconds: 0
-	property bool timerRunning: false	
+	// Timer state is owned by the driver countdown (/Timer/... paths), shared
+	// with the device settings page (PageHeater.qml). Duration range per
+	// Comfort Control manual: 30-720 min in 5-min steps.
+	readonly property int timerSelectedMinutes: backendTimerDuration.valid ? backendTimerDuration.value : 0
+	readonly property int timerRemainingSeconds: backendTimerRemaining.valid ? backendTimerRemaining.value : 0
+	readonly property bool timerRunning: root.isRunning && root.timerRemainingSeconds > 0
 	readonly property var timerStepMinutes: [5, 15, 30]
-	readonly property var timerPresetMinutes: [30, 60, 90]
+	readonly property var timerPresetMinutes: backendTimerPreset0.valid
+		? [backendTimerPreset0.value, backendTimerPreset1.value, backendTimerPreset2.value]
+		: [30, 60, 90]
 	readonly property string timerDisplayText: {
-		const total = timerRunning ? timerRemainingSeconds : timerSelectedMinutes * 60
+		const total = timerRemainingSeconds
 		if (total <= 0) {
 			return "--:--"
 		}
@@ -1191,23 +1194,34 @@ SwipeViewPage {
 		uid: root.bindPrefix + "/Alarms/Communication"
 	}
 
-	// UI-side countdown ticker. TODO: replace with backend timer state once wired.
-	Timer {
-		id: timerTicker
-		interval: 1000
-		running: root.timerRunning && root.timerRemainingSeconds > 0
-		repeat: true
-		onTriggered: {
-			root.timerRemainingSeconds -= 1
-			if (root.timerRemainingSeconds === 0) {
-				root.timerRunning = false
-				root.timerSelectedMinutes = 0
-				// Timer done: stop the heater immediately.
-				root.pendingStartStopAction = "stop"
-				startStop.setValue(0)
-			}
-		}
+	// Backend countdown timer, shared with the device settings page.
+	VeQuickItem {
+		id: backendTimerDuration
+		uid: root.bindPrefix + "/Timer/DurationMinutes"
 	}
+
+	VeQuickItem {
+		id: backendTimerRemaining
+		uid: root.bindPrefix + "/Timer/RemainingSeconds"
+	}
+
+	VeQuickItem {
+		id: backendTimerPreset0
+		uid: root.bindPrefix + "/Settings/Timer/Preset/0"
+	}
+
+	VeQuickItem {
+		id: backendTimerPreset1
+		uid: root.bindPrefix + "/Settings/Timer/Preset/1"
+	}
+
+	VeQuickItem {
+		id: backendTimerPreset2
+		uid: root.bindPrefix + "/Settings/Timer/Preset/2"
+	}
+
+	// Countdown ticking, expiry auto-stop and freeze-on-stop are owned by the
+	// driver; the UI only reads /Timer/RemainingSeconds.
 
 	Connections {
 		target: heaterState
@@ -1221,10 +1235,8 @@ SwipeViewPage {
 				root.pendingStartStopAction = ""
 			}
 			// Heater stopped for any reason (manual stop, fault, shutdown):
-			// cancel the countdown. The armed value stays for the next start.
-			if (heaterState.value === 0 || heaterState.value === 10) {
-				root.stopTimer()
-			}
+			// the driver freezes the countdown at the armed duration, which
+			// stays set for the next start.
 		}
 	}
 
@@ -1242,12 +1254,6 @@ SwipeViewPage {
 				if (result === T.Dialog.Accepted) {
 					root.pendingStartStopAction = startRequested ? "start" : "stop"
 					startStop.setValue(startRequested ? 1 : 0)
-					// Timer tab: armed countdown starts/stops with the heater.
-					if (startRequested) {
-						root.startTimer()
-					} else {
-						root.stopTimer()
-					}
 				}
 			}
 		}
@@ -1289,46 +1295,15 @@ SwipeViewPage {
 	}
 
 	function setTimerDuration(minutes) {
-		if (timerSelectedMinutes === minutes) {
-			timerSelectedMinutes = 0
-			return
-		}
-		timerSelectedMinutes = minutes
-		if (timerRunning) {
-			timerRemainingSeconds = minutes * 60
-		} else if (isRunning) {
-			// Heater already running: start the countdown immediately.
-			startTimer()
-		}
+		backendTimerDuration.setValue(timerSelectedMinutes === minutes ? 0 : minutes)
 	}
 
 	function addTimerMinutes(minutes) {
-		timerSelectedMinutes = Math.max(0, Math.min(timerSelectedMinutes + minutes, 720))
-		if (timerRunning) {
-			timerRemainingSeconds = Math.max(0, Math.min(timerRemainingSeconds + minutes * 60, 720 * 60))
-		} else if (isRunning && timerSelectedMinutes > 0) {
-			// Heater already running: start the countdown immediately.
-			startTimer()
-		}
+		backendTimerDuration.setValue(Math.max(0, Math.min(timerSelectedMinutes + minutes, 720)))
 	}
 
 	function resetTimer() {
-		timerSelectedMinutes = 0
-		timerRunning = false
-		timerRemainingSeconds = 0
-	}
-
-	function startTimer() {
-		if (timerSelectedMinutes <= 0) {
-			return
-		}
-		timerRemainingSeconds = timerSelectedMinutes * 60
-		timerRunning = true
-	}
-
-	function stopTimer() {
-		timerRunning = false
-		timerRemainingSeconds = 0
+		backendTimerDuration.setValue(0)
 	}
 
 	function adjustRingValue(delta) {

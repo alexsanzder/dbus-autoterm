@@ -350,6 +350,33 @@ class TimerCountdownTest(unittest.TestCase):
         service.set_value("/Timer/DurationMinutes", 0)
         self.assertEqual(adapter._timer_duration_minutes, 0)
 
+    def test_timer_presets_default_and_clamped(self):
+        service, adapter = self._build_adapter()
+
+        self.assertEqual(adapter.timer_presets, [30, 60, 90])
+        self.assertEqual(service["/Settings/Timer/Preset/0"], 30)
+
+        service.set_value("/Settings/Timer/Preset/1", 40)
+        self.assertEqual(adapter.timer_presets[1], 40)
+
+        service.set_value("/Settings/Timer/Preset/2", 5)
+        self.assertEqual(adapter.timer_presets[2], 30)
+        service.set_value("/Settings/Timer/Preset/2", 900)
+        self.assertEqual(adapter.timer_presets[2], 720)
+        service.set_value("/Settings/Timer/Preset/0", "junk")
+        self.assertEqual(adapter.timer_presets[0], 30)
+
+    def test_timer_presets_custom_initial_values(self):
+        service = MockVeDbusService("com.victronenergy.heater.autoterm_air2d")
+        adapter = HeaterDbusAdapter(
+            config=DriverConfig(),
+            service=service,
+            timer_presets=[40, 50, 60],
+        )
+
+        self.assertEqual(adapter.timer_presets, [40, 50, 60])
+        self.assertEqual(service["/Settings/Timer/Preset/2"], 60)
+
 
 if __name__ == "__main__":
     unittest.main()

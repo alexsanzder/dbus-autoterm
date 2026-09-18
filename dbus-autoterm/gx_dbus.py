@@ -168,6 +168,7 @@ class HeaterDbusAdapter:
         config: DriverConfig | None = None,
         service=None,
         on_startstop: Callable[[bool], bool] | None = None,
+        timer_presets: list[int] | None = None,
     ) -> None:
         self.config = config or DriverConfig()
         self.service = service or build_vedbus_service(self.config.service_name)
@@ -181,6 +182,8 @@ class HeaterDbusAdapter:
         self._timers = [HeaterTimerEntry() for _ in range(3)]
         self._timer_duration_minutes = 0
         self._timer_deadline: float | None = None
+        self._timer_presets = [max(30, min(720, int(minutes))) for minutes in (timer_presets or [30, 60, 90])]
+        self._on_timer_preset_change: Callable[[int, int], bool] | None = None
         # Per-mode stepper memories (Comfort Control p10-12): Power and
         # Ventilation keep independent power levels; Temperature and
         # Heat+Ventilation keep independent setpoints. The heater wire format
@@ -204,6 +207,10 @@ class HeaterDbusAdapter:
         if mode in {HeaterUiMode.POWER, HeaterUiMode.VENTILATION}:
             return {"power_level": self._mode_power[mode]}
         return {"setpoint_c": self._mode_setpoint[mode]}
+
+    @property
+    def timer_presets(self) -> list[int]:
+        return list(self._timer_presets)
 
     @property
     def current_heater_mode(self) -> HeaterUiMode:
@@ -398,6 +405,8 @@ class HeaterDbusAdapter:
             self.service.add_path(f"{prefix}/PowerLevel", self._timers[index].power_level, writeable=True, onchangecallback=self._timer_callback(index, "power_level", 1, 9))
         self.service.add_path("/Timer/DurationMinutes", 0, writeable=True, onchangecallback=self._handle_timer_duration_change)
         self.service.add_path("/Timer/RemainingSeconds", 0)
+        for index in range(len(self._timer_presets)):
+            self.service.add_path(f"/Settings/Timer/Preset/{index}", self._timer_presets[index], writeable=True, onchangecallback=self._handle_timer_preset_change(index))
         self.service.register()
 
     def _handle_startstop(self, path: str, value: object) -> bool:
@@ -459,6 +468,21 @@ class HeaterDbusAdapter:
         self._timer_duration_minutes = minutes
         self._timer_deadline = None
         return True
+
+    def _handle_timer_preset_change(self, index: int):
+        def _callback(path: str, value: object) -> bool:
+            del path
+            try:
+                minutes = int(value)
+            except (TypeError, ValueError):
+                return False
+            minutes = max(30, min(720, minutes))
+            self._timer_presets[index] = minutes
+            if self._on_timer_preset_change is not None and not self._on_timer_preset_change(index, minutes):
+                return False
+            return True
+
+        return _callback
 
     def _handle_power_level_change(self, path: str, value: object) -> bool:
         del path

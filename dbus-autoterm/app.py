@@ -32,6 +32,7 @@ class RuntimeConfig:
     poll_interval: float = 1.0
     log_level: str = "INFO"
     mock_dbus: bool = False
+    timer_presets: tuple[int, int, int] = (30, 60, 90)
     driver_config: DriverConfig = field(default_factory=DriverConfig)
 
 
@@ -149,6 +150,24 @@ class HeaterDriverApp:
             self._publish_snapshot_with_room_context(self.provider.get_snapshot())
         return True
 
+    def update_timer_preset(self, index: int, minutes: int) -> bool:
+        self._persist_timer_presets()
+        return True
+
+    def _persist_timer_presets(self) -> None:
+        if self.config_path is None:
+            return
+        config = ConfigParser()
+        if self.config_path.exists():
+            with self.config_path.open("r", encoding="utf-8") as handle:
+                config.read_file(handle)
+        if not config.has_section("timer"):
+            config.add_section("timer")
+        for index, minutes in enumerate(self.dbus_adapter.timer_presets):
+            config.set("timer", f"preset{index}", str(minutes))
+        with self.config_path.open("w", encoding="utf-8") as handle:
+            config.write(handle)
+
     def _persist_room_temperature_service(self, service_name: str) -> None:
         if self.config_path is None:
             return
@@ -218,6 +237,11 @@ def _build_runtime_config(args: argparse.Namespace, arg_list: list[str], config:
         args.log_level if "--log-level" in arg_list else _config_get(config, "driver", "log_level", args.log_level)
     )
     mock_dbus = args.mock_dbus or _config_getboolean(config, "driver", "mock_dbus", False)
+    timer_presets = (
+        _config_getint(config, "timer", "preset0", 30),
+        _config_getint(config, "timer", "preset1", 60),
+        _config_getint(config, "timer", "preset2", 90),
+    )
     driver_config = DriverConfig(
         service_name=args.service_name or _config_get(config, "dbus", "service_name", DriverConfig.service_name),
         device_instance=(
@@ -242,6 +266,7 @@ def _build_runtime_config(args: argparse.Namespace, arg_list: list[str], config:
         poll_interval=poll_interval,
         log_level=log_level,
         mock_dbus=mock_dbus,
+        timer_presets=timer_presets,
         driver_config=driver_config,
     )
 
@@ -324,6 +349,7 @@ def main(argv: list[str] | None = None) -> int:
     dbus_adapter = HeaterDbusAdapter(
         config=runtime.driver_config,
         service=service,
+        timer_presets=list(runtime.timer_presets),
     )
     if runtime.mock_dbus:
         room_temperature_reader = NullRoomTemperatureReader()
@@ -342,6 +368,7 @@ def main(argv: list[str] | None = None) -> int:
     dbus_adapter._on_target_temperature_change = app.update_target_temperature
     dbus_adapter._on_power_level_change = app.update_power_level
     dbus_adapter._on_room_temperature_service_change = app.update_room_temperature_service
+    dbus_adapter._on_timer_preset_change = app.update_timer_preset
 
     try:
         try:
