@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 from dataclasses import dataclass
 from enum import IntEnum
 from pathlib import Path
@@ -178,6 +179,8 @@ class HeaterDbusAdapter:
         self._heater_mode = HeaterUiMode.POWER
         self._sensor_source = HeaterSensorSource.EXTERNAL
         self._timers = [HeaterTimerEntry() for _ in range(3)]
+        self._timer_duration_minutes = 0
+        self._timer_deadline: float | None = None
         # Per-mode stepper memories (Comfort Control p10-12): Power and
         # Ventilation keep independent power levels; Temperature and
         # Heat+Ventilation keep independent setpoints. The heater wire format
@@ -393,6 +396,8 @@ class HeaterDbusAdapter:
             self.service.add_path(f"{prefix}/Mode", self._timers[index].mode, writeable=True, onchangecallback=self._timer_callback(index, "mode", int(HeaterUiMode.POWER), int(HeaterUiMode.HEAT_VENTILATION)))
             self.service.add_path(f"{prefix}/TargetTemperature", self._timers[index].target_temperature, writeable=True, onchangecallback=self._timer_callback(index, "target_temperature", 0, 30))
             self.service.add_path(f"{prefix}/PowerLevel", self._timers[index].power_level, writeable=True, onchangecallback=self._timer_callback(index, "power_level", 1, 9))
+        self.service.add_path("/Timer/DurationMinutes", 0, writeable=True, onchangecallback=self._handle_timer_duration_change)
+        self.service.add_path("/Timer/RemainingSeconds", 0)
         self.service.register()
 
     def _handle_startstop(self, path: str, value: object) -> bool:
@@ -443,6 +448,18 @@ class HeaterDbusAdapter:
             return False
         return self._on_target_temperature_change(setpoint)
 
+    def _handle_timer_duration_change(self, path: str, value: object) -> bool:
+        del path
+        try:
+            minutes = int(value)
+        except (TypeError, ValueError):
+            return False
+        if minutes != 0:
+            minutes = max(30, min(720, minutes))
+        self._timer_duration_minutes = minutes
+        self._timer_deadline = None
+        return True
+
     def _handle_power_level_change(self, path: str, value: object) -> bool:
         del path
         try:
@@ -453,6 +470,27 @@ class HeaterDbusAdapter:
         if self._on_power_level_change is None:
             return False
         return self._on_power_level_change(level)
+
+    def _publish_timer(self, snapshot: HeaterSnapshot, is_connected: bool) -> None:
+        duration = self._timer_duration_minutes
+        active = is_connected and snapshot.phase in {
+            HeaterPhase.STARTING,
+            HeaterPhase.WARMING_UP,
+            HeaterPhase.RUNNING,
+        }
+        if not active or duration == 0:
+            self._timer_deadline = None
+            self.service["/Timer/RemainingSeconds"] = duration * 60
+            return
+        if self._timer_deadline is None:
+            self._timer_deadline = time.monotonic() + duration * 60
+        remaining = max(0, int(round(self._timer_deadline - time.monotonic())))
+        if remaining == 0:
+            self._timer_duration_minutes = 0
+            self._timer_deadline = None
+            if self._on_startstop is not None:
+                self._on_startstop(False)
+        self.service["/Timer/RemainingSeconds"] = remaining
 
     def _heater_state(self, snapshot: HeaterSnapshot, is_connected: bool) -> int:
         if not is_connected or snapshot.telemetry.error_code:
@@ -552,6 +590,7 @@ class HeaterDbusAdapter:
         self.service["/Settings/Mode"] = int(snapshot.settings.mode)
         self.service["/Settings/TargetTemperature"] = snapshot.settings.setpoint_c
         self.service["/Settings/PowerLevel"] = snapshot.settings.power_level
+        self._publish_timer(snapshot, is_connected)
 
     def publish_room_temperature_services(
         self,

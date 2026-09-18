@@ -109,6 +109,23 @@ DevicePage {
 			secondaryText: dataItem.valid ? Utils.secondsToString(dataItem.value, false) : "0"
 		}
 
+		ListText {
+			text: "Timer remaining"
+			preferredVisible: timerDuration.valid && timerDuration.value > 0
+			secondaryText: timerRemaining.valid ? Utils.secondsToString(timerRemaining.value, false) : "--:--"
+		}
+
+		ListRadioButtonGroup {
+			text: "Timer"
+			dataItem.uid: root.bindPrefix + "/Timer/DurationMinutes"
+			optionModel: [
+				{ display: "Off", value: 0 },
+				{ display: "30 min", value: 30 },
+				{ display: "60 min", value: 60 },
+				{ display: "90 min", value: 90 },
+			]
+		}
+
 		ListRadioButtonGroup {
 			text: "Mode"
 			dataItem.uid: root.bindPrefix + "/Mode"
@@ -240,6 +257,16 @@ DevicePage {
 	VeQuickItem {
 		id: heaterTemperature
 		uid: root.bindPrefix + "/Temperatures/Heater"
+	}
+
+	VeQuickItem {
+		id: timerDuration
+		uid: root.bindPrefix + "/Timer/DurationMinutes"
+	}
+
+	VeQuickItem {
+		id: timerRemaining
+		uid: root.bindPrefix + "/Timer/RemainingSeconds"
 	}
 
 	Component {

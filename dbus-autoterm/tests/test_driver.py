@@ -1,7 +1,8 @@
 import unittest
+import unittest.mock
 
 from app import HeaterDriverApp
-from domain import HeaterPhase
+from domain import HeaterPhase, HeaterSnapshot
 from gx_dbus import DriverConfig, HeaterDbusAdapter, MockVeDbusService
 from protocol import CONTROLLER_PROFILE, Frame
 from provider import DummyHeaterProvider, SerialHeaterProvider, SerialProviderConfig
@@ -304,6 +305,50 @@ class DriverTests(unittest.TestCase):
 
         self.assertFalse(provider._matches_response(request, echoed_request))
         self.assertTrue(provider._matches_response(request, heater_response))
+
+
+class TimerCountdownTest(unittest.TestCase):
+    def _build_adapter(self, on_startstop=None):
+        service = MockVeDbusService("com.victronenergy.heater.autoterm_air2d")
+        adapter = HeaterDbusAdapter(config=DriverConfig(), service=service, on_startstop=on_startstop)
+        return service, adapter
+
+    def test_arm_timer_publishes_full_remaining_when_off(self):
+        _, service, app = DriverTests()._build_app()
+
+        service.set_value("/Timer/DurationMinutes", 30)
+        self.assertEqual(service["/Timer/DurationMinutes"], 30)
+        app.run_once()
+
+        self.assertEqual(service["/Timer/RemainingSeconds"], 1800)
+        self.assertEqual(service["/Timer/DurationMinutes"], 30)
+
+    def test_countdown_ticks_and_expiry_stops_heater(self):
+        stops = []
+        service, adapter = self._build_adapter(on_startstop=lambda enabled: stops.append(enabled) or True)
+        adapter.service.set_value("/Timer/DurationMinutes", 30)
+        running = HeaterSnapshot(phase=HeaterPhase.RUNNING)
+
+        adapter.publish_snapshot(running, True)
+        self.assertGreaterEqual(service["/Timer/RemainingSeconds"], 1798)
+        self.assertLessEqual(service["/Timer/RemainingSeconds"], 1800)
+
+        with unittest.mock.patch("gx_dbus.time.monotonic", return_value=adapter._timer_deadline + 10):
+            adapter.publish_snapshot(running, True)
+
+        self.assertEqual(service["/Timer/RemainingSeconds"], 0)
+        self.assertEqual(adapter._timer_duration_minutes, 0)
+        self.assertEqual(stops, [False])
+
+    def test_duration_clamped_and_zero_cancels(self):
+        service, adapter = self._build_adapter()
+
+        service.set_value("/Timer/DurationMinutes", 5)
+        self.assertEqual(adapter._timer_duration_minutes, 30)
+        service.set_value("/Timer/DurationMinutes", 800)
+        self.assertEqual(adapter._timer_duration_minutes, 720)
+        service.set_value("/Timer/DurationMinutes", 0)
+        self.assertEqual(adapter._timer_duration_minutes, 0)
 
 
 if __name__ == "__main__":
