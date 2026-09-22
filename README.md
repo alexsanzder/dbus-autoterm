@@ -4,6 +4,10 @@
 
 For real serial testing on a Cerbo GX, the important operational detail is that Venus OS runs `serial-starter`, which probes generic USB serial adapters and can attach competing services to `/dev/ttyUSB*`. A stock FT232R adapter is additionally classified by the default Venus rule set as `FT232R_USB_UART`, which marks it as `rs485:default`. Removing that stock FT232R classification alone is not sufficient, because generic `serial-starter` probing still continues unless the adapter is explicitly marked with `VE_SERVICE="ignore"`. Those probes can interfere with `dbus-autoterm` when both processes try to use the same underlying tty.
 
+## ⚠️ Disclaimer
+
+This project controls combustion equipment and electrical systems. It has no safety certification of any kind. Use it at your own risk.
+
 ## 🚧 WORK IN PROGRESS
 
 This project is still under active development. The Cerbo integration, custom heater UI, emulator, and serial hardware path are usable for ongoing development and testing, but the overall system is not finished yet.
