@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 import sys
+import logging
+import time
 from dataclasses import dataclass
 from enum import IntEnum
 from pathlib import Path
@@ -137,6 +139,8 @@ class HeaterState(IntEnum):
     ERROR = 10
 
 
+LOG = logging.getLogger(__name__)
+
 @dataclass
 class HeaterTimerEntry:
     enabled: int = 0
@@ -145,11 +149,12 @@ class HeaterTimerEntry:
     start_hour: int = 6
     start_minute: int = 0
     duration_minutes: int = 30
-    mode: int = int(HeaterUiMode.TEMPERATURE)
+    mode: int = int(HeaterUiMode.POWER)
     target_temperature: int = 20
     power_level: int = 2
 
 
+@dataclass
 @dataclass
 class DriverConfig:
     service_name: str = "com.victronenergy.heater.autoterm_air2d"
@@ -167,6 +172,9 @@ class HeaterDbusAdapter:
         config: DriverConfig | None = None,
         service=None,
         on_startstop: Callable[[bool], bool] | None = None,
+        timer_presets: list[int] | None = None,
+        timer_entries: list[HeaterTimerEntry] | None = None,
+        timer_mode: int = 0,
     ) -> None:
         self.config = config or DriverConfig()
         self.service = service or build_vedbus_service(self.config.service_name)
@@ -177,8 +185,53 @@ class HeaterDbusAdapter:
         self._on_room_temperature_service_change: Callable[[str], bool] | None = None
         self._heater_mode = HeaterUiMode.POWER
         self._sensor_source = HeaterSensorSource.EXTERNAL
-        self._timers = [HeaterTimerEntry() for _ in range(3)]
+        self._timers = list(timer_entries) if timer_entries else [HeaterTimerEntry() for _ in range(3)]
+        self._timer_duration_minutes = 0
+        self._timer_deadline: float | None = None
+        self._timer_mode = timer_mode if timer_mode in (0, 2, 3) else 0
+        # Indices 0-2 are the HeaterPage "+minutes" steps, 3-5 the preset durations.
+        self._timer_presets = [
+            max(5 if index < 3 else 30, min(720, int(minutes)))
+            for index, minutes in enumerate(timer_presets or [5, 15, 30, 30, 60, 90])
+        ]
+        self._on_timer_preset_change: Callable[[int, int], bool] | None = None
+        self._on_timer_entry_change: Callable[[], None] | None = None
+        self._on_timer_mode_change: Callable[[int], bool] | None = None
+        # Per-mode stepper memories (Comfort Control p10-12): Power and
+        # Ventilation keep independent power levels; Temperature and
+        # Heat+Ventilation keep independent setpoints. The heater wire format
+        # carries one active settings payload, so switching UI mode reapplies
+        # the cached value for that mode.
+        self._mode_power = {
+            HeaterUiMode.POWER: 2,
+            HeaterUiMode.VENTILATION: 2,
+            HeaterUiMode.HEAT_VENTILATION: 2,
+            HeaterUiMode.TEMPERATURE: 2,
+        }
+        self._mode_setpoint = {
+            HeaterUiMode.TEMPERATURE: 15,
+            HeaterUiMode.HEAT_VENTILATION: 15,
+        }
         self._init_service()
+
+    def mode_settings_overrides(self) -> dict:
+        """Cached stepper values to reapply when the UI mode changes."""
+        mode = self._heater_mode
+        if mode in {HeaterUiMode.POWER, HeaterUiMode.VENTILATION}:
+            return {"power_level": self._mode_power[mode]}
+        return {"setpoint_c": self._mode_setpoint[mode]}
+
+    @property
+    def timer_mode(self) -> int:
+        return self._timer_mode
+
+    @property
+    def timer_entries(self) -> list[HeaterTimerEntry]:
+        return list(self._timers)
+
+    @property
+    def timer_presets(self) -> list[int]:
+        return list(self._timer_presets)
 
     @property
     def current_heater_mode(self) -> HeaterUiMode:
@@ -294,9 +347,15 @@ class HeaterDbusAdapter:
                 numeric = min(maximum, numeric)
             numeric = max(minimum, numeric)
             setattr(timer, field, numeric)
+            LOG.info("SCHEDWRT T%d %s = %s (raw %r)", index, field, numeric, value)
+            self._notify_timer_entry_change()
             return True
 
         return _callback
+
+    def _notify_timer_entry_change(self) -> None:
+        if self._on_timer_entry_change is not None:
+            self._on_timer_entry_change()
 
     def _init_service(self) -> None:
         self.service.add_mandatory_paths(
@@ -362,15 +421,21 @@ class HeaterDbusAdapter:
             self.service.add_path(f"{prefix}/Temperature", None)
         for index in range(len(self._timers)):
             prefix = f"/Timers/{index}"
-            self.service.add_path(f"{prefix}/Enabled", self._timers[index].enabled, writeable=True, onchangecallback=self._timer_callback(index, "enabled", 0, 1))
-            self.service.add_path(f"{prefix}/Cycle", self._timers[index].cycle, writeable=True, onchangecallback=self._timer_callback(index, "cycle", 0, 2))
-            self.service.add_path(f"{prefix}/Days", self._timers[index].days, writeable=True, onchangecallback=self._timer_callback(index, "days", 0, 0x7F))
-            self.service.add_path(f"{prefix}/StartHour", self._timers[index].start_hour, writeable=True, onchangecallback=self._timer_callback(index, "start_hour", 0, 23))
-            self.service.add_path(f"{prefix}/StartMinute", self._timers[index].start_minute, writeable=True, onchangecallback=self._timer_callback(index, "start_minute", 0, 59))
-            self.service.add_path(f"{prefix}/DurationMinutes", self._timers[index].duration_minutes, writeable=True, onchangecallback=self._timer_callback(index, "duration_minutes", 1, 24 * 60))
-            self.service.add_path(f"{prefix}/Mode", self._timers[index].mode, writeable=True, onchangecallback=self._timer_callback(index, "mode", int(HeaterUiMode.POWER), int(HeaterUiMode.HEAT_VENTILATION)))
-            self.service.add_path(f"{prefix}/TargetTemperature", self._timers[index].target_temperature, writeable=True, onchangecallback=self._timer_callback(index, "target_temperature", 5, 35))
-            self.service.add_path(f"{prefix}/PowerLevel", self._timers[index].power_level, writeable=True, onchangecallback=self._timer_callback(index, "power_level", 1, 9))
+            self.service.add_path(f"{prefix}/Enabled", self._timers[index].enabled, writeable=True, onchangecallback=self._timer_callback(index, "enabled", 0, 1), valuetype=int)
+            self.service.add_path(f"{prefix}/Cycle", self._timers[index].cycle, writeable=True, onchangecallback=self._timer_callback(index, "cycle", 0, 2), valuetype=int)
+            self.service.add_path(f"{prefix}/Days", self._timers[index].days, writeable=True, onchangecallback=self._timer_callback(index, "days", 0, 0x7F), valuetype=int)
+            self.service.add_path(f"{prefix}/StartHour", self._timers[index].start_hour, writeable=True, onchangecallback=self._timer_callback(index, "start_hour", 0, 23), valuetype=int)
+            self.service.add_path(f"{prefix}/StartMinute", self._timers[index].start_minute, writeable=True, onchangecallback=self._timer_callback(index, "start_minute", 0, 59), valuetype=int)
+            self.service.add_path(f"{prefix}/StartTime", self._timers[index].start_hour * 3600 + self._timers[index].start_minute * 60, writeable=True, onchangecallback=self._timer_start_time_callback(index), valuetype=int)
+            self.service.add_path(f"{prefix}/DurationMinutes", self._timers[index].duration_minutes, writeable=True, onchangecallback=self._timer_callback(index, "duration_minutes", 1, 24 * 60), valuetype=int)
+            self.service.add_path(f"{prefix}/Mode", self._timers[index].mode, writeable=True, onchangecallback=self._timer_callback(index, "mode", int(HeaterUiMode.POWER), int(HeaterUiMode.HEAT_VENTILATION)), valuetype=int)
+            self.service.add_path(f"{prefix}/TargetTemperature", self._timers[index].target_temperature, writeable=True, onchangecallback=self._timer_callback(index, "target_temperature", 0, 30), valuetype=int)
+            self.service.add_path(f"{prefix}/PowerLevel", self._timers[index].power_level, writeable=True, onchangecallback=self._timer_callback(index, "power_level", 1, 9), valuetype=int)
+        self.service.add_path("/Timer/DurationMinutes", 0, writeable=True, onchangecallback=self._handle_timer_duration_change, valuetype=int)
+        self.service.add_path("/Timer/RemainingSeconds", 0, valuetype=int)
+        self.service.add_path("/Timer/Mode", self._timer_mode, writeable=True, onchangecallback=self._handle_timer_mode_change, valuetype=int)
+        for index in range(len(self._timer_presets)):
+            self.service.add_path(f"/Settings/Timer/Preset/{index}", self._timer_presets[index], writeable=True, onchangecallback=self._handle_timer_preset_change(index), valuetype=int)
         self.service.register()
 
     def _handle_startstop(self, path: str, value: object) -> bool:
@@ -387,11 +452,17 @@ class HeaterDbusAdapter:
             return False
         if new_mode in {HeaterUiMode.TEMPERATURE, HeaterUiMode.HEAT_VENTILATION} and self.service["/Capabilities/RoomTemperatureControl"] != 1:
             return False
+        # Manual: impossible to switch to any heating mode while the heater is
+        # operating in ventilation mode.
+        if new_mode is not HeaterUiMode.VENTILATION and self.service["/StateText"] in {
+            "starting ventilation",
+            "ventilation",
+            "stopping ventilation",
+        }:
+            return False
 
         previous_mode = self._heater_mode
         self._heater_mode = new_mode
-        if new_mode == HeaterUiMode.VENTILATION:
-            return True
         if self._on_mode_change is None:
             self._heater_mode = previous_mode
             return False
@@ -413,15 +484,103 @@ class HeaterDbusAdapter:
 
     def _handle_target_temperature_change(self, path: str, value: object) -> bool:
         del path
+        try:
+            setpoint = int(value)
+        except (TypeError, ValueError):
+            return False
+        if self._heater_mode in self._mode_setpoint:
+            self._mode_setpoint[self._heater_mode] = setpoint
         if self._on_target_temperature_change is None:
             return False
-        return self._on_target_temperature_change(int(value))
+        return self._on_target_temperature_change(setpoint)
+
+    def _handle_timer_duration_change(self, path: str, value: object) -> bool:
+        del path
+        try:
+            minutes = int(value)
+        except (TypeError, ValueError):
+            return False
+        if minutes != 0:
+            minutes = max(30, min(720, minutes))
+        self._timer_duration_minutes = minutes
+        self._timer_deadline = None
+        return True
+
+    def _timer_start_time_callback(self, index: int):
+        def _callback(path: str, value: object) -> bool:
+            del path
+            try:
+                seconds = int(value)
+            except (TypeError, ValueError):
+                return False
+            seconds = max(0, min(24 * 60 * 60 - 1, seconds))
+            timer = self._timers[index]
+            timer.start_hour = seconds // 3600
+            timer.start_minute = (seconds % 3600) // 60
+            self._notify_timer_entry_change()
+            return True
+
+        return _callback
+
+    def _handle_timer_mode_change(self, path: str, value: object) -> bool:
+        del path
+        try:
+            mode = int(value)
+        except (TypeError, ValueError):
+            return False
+        if mode not in (0, 2, 3):
+            return False
+        self._timer_mode = mode
+        if self._on_timer_mode_change is not None and not self._on_timer_mode_change(mode):
+            return False
+        return True
+
+    def _handle_timer_preset_change(self, index: int):
+        def _callback(path: str, value: object) -> bool:
+            del path
+            try:
+                minutes = int(value)
+            except (TypeError, ValueError):
+                return False
+            minutes = max(5 if index < 3 else 30, min(720, minutes))
+            self._timer_presets[index] = minutes
+            if self._on_timer_preset_change is not None and not self._on_timer_preset_change(index, minutes):
+                return False
+            return True
+
+        return _callback
 
     def _handle_power_level_change(self, path: str, value: object) -> bool:
         del path
+        try:
+            level = int(value)
+        except (TypeError, ValueError):
+            return False
+        self._mode_power[self._heater_mode] = level
         if self._on_power_level_change is None:
             return False
-        return self._on_power_level_change(int(value))
+        return self._on_power_level_change(level)
+
+    def _publish_timer(self, snapshot: HeaterSnapshot, is_connected: bool) -> None:
+        duration = self._timer_duration_minutes
+        active = is_connected and snapshot.phase in {
+            HeaterPhase.STARTING,
+            HeaterPhase.WARMING_UP,
+            HeaterPhase.RUNNING,
+        }
+        if not active or duration == 0:
+            self._timer_deadline = None
+            self.service["/Timer/RemainingSeconds"] = duration * 60
+            return
+        if self._timer_deadline is None:
+            self._timer_deadline = time.monotonic() + duration * 60
+        remaining = max(0, int(round(self._timer_deadline - time.monotonic())))
+        if remaining == 0:
+            self._timer_duration_minutes = 0
+            self._timer_deadline = None
+            if self._on_startstop is not None:
+                self._on_startstop(False)
+        self.service["/Timer/RemainingSeconds"] = remaining
 
     def _heater_state(self, snapshot: HeaterSnapshot, is_connected: bool) -> int:
         if not is_connected or snapshot.telemetry.error_code:
@@ -485,6 +644,11 @@ class HeaterDbusAdapter:
         else:
             self._heater_mode = HeaterUiMode.TEMPERATURE
         self._sync_sensor_source_from_mode(snapshot.settings.mode)
+        # Keep the active mode's memory in sync with what the heater reports;
+        # other modes keep their independent cached values.
+        self._mode_power[self._heater_mode] = snapshot.settings.power_level
+        if self._heater_mode in self._mode_setpoint:
+            self._mode_setpoint[self._heater_mode] = snapshot.settings.setpoint_c
 
         self.service["/Connected"] = 1 if is_connected else 0
         self.service["/State"] = self._heater_state(snapshot, is_connected)
@@ -516,6 +680,7 @@ class HeaterDbusAdapter:
         self.service["/Settings/Mode"] = int(snapshot.settings.mode)
         self.service["/Settings/TargetTemperature"] = snapshot.settings.setpoint_c
         self.service["/Settings/PowerLevel"] = snapshot.settings.power_level
+        self._publish_timer(snapshot, is_connected)
 
     def publish_room_temperature_services(
         self,

@@ -24,6 +24,15 @@ DevicePage {
 			{ display: "Power", value: 0 },
 			{ display: "Ventilation", value: 2 },
 		]
+	readonly property bool timerArmed: timerDuration.valid && timerDuration.value > 0
+	readonly property var timerOptions: timerPreset0.valid
+		? [
+			{ display: "Off", value: 0 },
+			{ display: timerPreset0.value + " min", value: timerPreset0.value },
+			{ display: timerPreset1.value + " min", value: timerPreset1.value },
+			{ display: timerPreset2.value + " min", value: timerPreset2.value },
+		]
+		: [{ display: "Off", value: 0 }]
 	readonly property string warningTitle: communicationAlarm.valid && communicationAlarm.value !== 0
 		? "Communication problem"
 		: (errorText.valid && errorText.value !== "" ? "Heater fault" : "")
@@ -109,6 +118,18 @@ DevicePage {
 			secondaryText: dataItem.valid ? Utils.secondsToString(dataItem.value, false) : "0"
 		}
 
+		ListText {
+			text: "Timer remaining"
+			preferredVisible: root.timerArmed
+			secondaryText: timerRemaining.valid ? Utils.formatAsHHMMSS(timerRemaining.value, false) : "--:--"
+		}
+
+		ListRadioButtonGroup {
+			text: "Timer"
+			dataItem.uid: root.bindPrefix + "/Timer/DurationMinutes"
+			optionModel: root.timerOptions
+		}
+
 		ListRadioButtonGroup {
 			text: "Mode"
 			dataItem.uid: root.bindPrefix + "/Mode"
@@ -126,8 +147,8 @@ DevicePage {
 			dataItem.uid: root.bindPrefix + "/Settings/TargetTemperature"
 			preferredVisible: root.showTemperatureControl
 			suffix: Units.defaultUnitString(Global.systemSettings.temperatureUnit)
-			from: 5
-			to: 35
+			from: 0
+			to: 30
 			stepSize: 1
 		}
 
@@ -181,6 +202,31 @@ DevicePage {
 						font.pixelSize: Theme.font_size_body2
 						color: Theme.color_listItem_secondaryText
 					}
+
+					Label {
+						anchors.verticalCenter: parent.verticalCenter
+						text: "|"
+						font.pixelSize: Theme.font_size_body2
+						color: Theme.color_listItem_secondaryText
+						visible: root.timerArmed
+					}
+
+					CP.ColorImage {
+						source: "qrc:/images/icon_manualstart_timer_24.svg"
+						color: Theme.color_listItem_secondaryText
+						width: 24
+						height: 24
+						anchors.verticalCenter: parent.verticalCenter
+						visible: root.timerArmed
+					}
+
+					Label {
+						anchors.verticalCenter: parent.verticalCenter
+						text: timerRemaining.valid ? Utils.formatAsHHMMSS(timerRemaining.value, false) : "--:--"
+						font.pixelSize: Theme.font_size_body2
+						color: Theme.color_listItem_secondaryText
+						visible: root.timerArmed
+					}
 				}
 			]
 		}
@@ -195,6 +241,13 @@ DevicePage {
 		ListNavigation {
 			text: "Diagnostics"
 			onClicked: Global.pageManager.pushPage("/pages/settings/devicelist/heater/PageHeaterDiagnostics.qml", {
+				bindPrefix: root.bindPrefix,
+			})
+		}
+
+		ListNavigation {
+			text: "Timer settings"
+			onClicked: Global.pageManager.pushPage("/pages/settings/devicelist/heater/PageHeaterTimerSettings.qml", {
 				bindPrefix: root.bindPrefix,
 			})
 		}
@@ -240,6 +293,31 @@ DevicePage {
 	VeQuickItem {
 		id: heaterTemperature
 		uid: root.bindPrefix + "/Temperatures/Heater"
+	}
+
+	VeQuickItem {
+		id: timerDuration
+		uid: root.bindPrefix + "/Timer/DurationMinutes"
+	}
+
+	VeQuickItem {
+		id: timerRemaining
+		uid: root.bindPrefix + "/Timer/RemainingSeconds"
+	}
+
+	VeQuickItem {
+		id: timerPreset0
+		uid: root.bindPrefix + "/Settings/Timer/Preset/3"
+	}
+
+	VeQuickItem {
+		id: timerPreset1
+		uid: root.bindPrefix + "/Settings/Timer/Preset/4"
+	}
+
+	VeQuickItem {
+		id: timerPreset2
+		uid: root.bindPrefix + "/Settings/Timer/Preset/5"
 	}
 
 	Component {

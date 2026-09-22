@@ -94,6 +94,12 @@ install_dependency \
     "pyserial-*"
 
 rm -f "$ARCHIVE"
+
+is_darwin=0
+if uname -s 2>/dev/null | grep -qi "darwin"; then
+    is_darwin=1
+fi
+
 tar_args=""
 if "$TAR_BIN" --help 2>/dev/null | grep -q -- '--no-mac-metadata'; then
     tar_args="$tar_args --no-mac-metadata"
@@ -101,18 +107,78 @@ fi
 if "$TAR_BIN" --help 2>/dev/null | grep -q -- '--no-xattrs'; then
     tar_args="$tar_args --no-xattrs"
 fi
+if "$TAR_BIN" --help 2>/dev/null | grep -q -- '--no-acls'; then
+    tar_args="$tar_args --no-acls"
+fi
+if "$TAR_BIN" --help 2>/dev/null | grep -q -- '--no-fflags'; then
+    tar_args="$tar_args --no-fflags"
+fi
 if [ "$GUI_VARIANT" = "default" ]; then
     VARIANT_EXCLUDE="--exclude=dbus-autoterm/native-gui"
+else
+    # For native-gui variant, explicitly include native-gui
+    VARIANT_EXCLUDE=""
 fi
+# even with COPYFILE_DISABLE and --no-xattrs, so BusyBox tar on Venus
+# prints 12x "Ignoring unknown ...". xattr -c cannot clear it on SIP
+# volumes. Use python tarfile on Darwin which never stores xattrs.
+if [ "$is_darwin" -eq 1 ] && command -v python3 >/dev/null 2>&1; then
+    python3 - "$ROOT_DIR" "$ARCHIVE" "$GUI_VARIANT" <<'PY'
+import pathlib, tarfile, fnmatch, sys
+root = pathlib.Path(sys.argv[1])
+archive = pathlib.Path(sys.argv[2])
+variant = sys.argv[3]
+excludes = [
+    "dbus-autoterm/__pycache__",
+    "dbus-autoterm/tests",
+    "dbus-autoterm/*.pyc",
+    "dbus-autoterm/.DS_Store",
+    "dbus-autoterm/._*",
+]
+if variant == "default":
+    excludes.append("dbus-autoterm/native-gui")
 
-"$TAR_BIN" -C "$ROOT_DIR" $tar_args \
-    --exclude='dbus-autoterm/__pycache__' \
-    --exclude='dbus-autoterm/tests' \
-    --exclude='dbus-autoterm/*.pyc' \
-    --exclude='dbus-autoterm/.DS_Store' \
-    --exclude='dbus-autoterm/._*' \
-    $VARIANT_EXCLUDE \
-    -czf "$ARCHIVE" \
-    dbus-autoterm
+def excluded(rel_posix: str) -> bool:
+    for pat in excludes:
+        if fnmatch.fnmatch(rel_posix, pat) or rel_posix.startswith(pat.rstrip("*")) and pat.endswith("*") and False:
+            return True
+        # fnmatch handles *; also handle directory prefix
+        if fnmatch.fnmatch(rel_posix, pat):
+            return True
+        if pat.endswith("/*") and rel_posix.startswith(pat[:-1]):
+            return True
+        if pat == rel_posix or rel_posix.startswith(pat + "/"):
+            return True
+    return False
 
+with tarfile.open(archive, "w:gz", format=tarfile.USTAR_FORMAT) as tf:
+    base = root / "dbus-autoterm"
+    for p in root.rglob("*"):
+        # only include dbus-autoterm tree
+        try:
+            rel = p.relative_to(root)
+        except ValueError:
+            continue
+        rel_posix = rel.as_posix()
+        if not rel_posix.startswith("dbus-autoterm"):
+            continue
+        if rel_posix == "dbus-autoterm":
+            tf.add(p, arcname=rel_posix, recursive=False)
+            continue
+        if excluded(rel_posix):
+            continue
+        # skip pycache internals already excluded
+        tf.add(p, arcname=rel_posix, recursive=False)
+PY
+else
+    "$TAR_BIN" -C "$ROOT_DIR" $tar_args \
+        --exclude='dbus-autoterm/__pycache__' \
+        --exclude='dbus-autoterm/tests' \
+        --exclude='dbus-autoterm/*.pyc' \
+        --exclude='dbus-autoterm/.DS_Store' \
+        --exclude='dbus-autoterm/._*' \
+        $VARIANT_EXCLUDE \
+        -czf "$ARCHIVE" \
+        dbus-autoterm
+fi
 echo "Created $ARCHIVE"

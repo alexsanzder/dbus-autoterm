@@ -1,0 +1,64 @@
+{
+  "extraction_date": "2026-09-15T15:36:22.901714",
+  "source_file": "captured_data/driver_20260915_153621.log",
+  "summary": {
+    "total_rx_frames": 4,
+    "total_tx_frames": 4,
+    "status_frames_0x0f": 4
+  },
+  "frames": {
+    "rx_frames": [
+      {
+        "message_type": "0x0f",
+        "device": "0x04",
+        "payload": "0323001c7f0084012d08004646000000000062",
+        "timestamp": "2026-09-15T15:36:22.901674"
+      },
+      {
+        "message_type": "0x0f",
+        "device": "0x04",
+        "payload": "0323001c7f0083012d08004647000000000062",
+        "timestamp": "2026-09-15T15:36:22.901689"
+      },
+      {
+        "message_type": "0x0f",
+        "device": "0x04",
+        "payload": "0323001c7f0084012d08004645000000000062",
+        "timestamp": "2026-09-15T15:36:22.901700"
+      },
+      {
+        "message_type": "0x0f",
+        "device": "0x04",
+        "payload": "0323001c7f0084012d08004645000000000062",
+        "timestamp": "2026-09-15T15:36:22.901709"
+      }
+    ],
+    "tx_frames": [
+      {
+        "message_type": "0x0f",
+        "device": "0x03",
+        "payload": "",
+        "timestamp": "2026-09-15T15:36:22.901636"
+      },
+      {
+        "message_type": "0x0f",
+        "device": "0x03",
+        "payload": "",
+        "timestamp": "2026-09-15T15:36:22.901680"
+      },
+      {
+        "message_type": "0x0f",
+        "device": "0x03",
+        "payload": "",
+        "timestamp": "2026-09-15T15:36:22.901694"
+      },
+      {
+        "message_type": "0x0f",
+        "device": "0x03",
+        "payload": "",
+        "timestamp": "2026-09-15T15:36:22.901704"
+      }
+    ],
+    "timestamps": []
+  }
+}

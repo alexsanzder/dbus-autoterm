@@ -15,6 +15,15 @@ PATCHED_FILES=(
 
 ADDED_FILES=(
     "images/heater_bottom_bar.svg"
+    "images/icon_flame.svg"
+    "images/icon_info.svg"
+    "images/icon_power.svg"
+    "images/icon_pump.svg"
+    "images/icon_alert.svg"
+    "images/icon_fan_clock.svg"
+    "images/icon_timer_minus.svg"
+    "images/icon_timer_plus.svg"
+    "images/icon_timer_remove.svg"
     "pages/CircularHeaterRing.qml"
     "pages/HeaterPage.qml"
     "pages/HeaterTab.qml"
@@ -61,7 +70,9 @@ restore_backup() {
 restart_gui() {
     local service_path
 
-    if [ -d "/service/gui" ]; then
+    if [ -d "/service/gui-v2" ]; then
+        service_path="/service/gui-v2"
+    elif [ -d "/service/gui" ]; then
         service_path="/service/gui"
     else
         service_path="/service/start-gui"

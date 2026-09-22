@@ -14,6 +14,11 @@ PATCHED_FILES=(
 
 ADDED_FILES=(
     "images/heater_bottom_bar.svg"
+    "images/icon_flame.svg"
+    "images/icon_fan_clock.svg"
+    "images/icon_timer_minus.svg"
+    "images/icon_timer_plus.svg"
+    "images/icon_timer_remove.svg"
     "pages/HeaterPage.qml"
 )
 
@@ -47,7 +52,9 @@ remove_file() {
 restart_gui() {
     local service_path
 
-    if [ -d "/service/gui" ]; then
+    if [ -d "/service/gui-v2" ]; then
+        service_path="/service/gui-v2"
+    elif [ -d "/service/gui" ]; then
         service_path="/service/gui"
     else
         service_path="/service/start-gui"

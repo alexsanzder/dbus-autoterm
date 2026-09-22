@@ -1,7 +1,8 @@
 import unittest
+import unittest.mock
 
 from app import HeaterDriverApp
-from domain import HeaterPhase
+from domain import HeaterPhase, HeaterSnapshot
 from gx_dbus import DriverConfig, HeaterDbusAdapter, MockVeDbusService
 from protocol import CONTROLLER_PROFILE, Frame
 from provider import DummyHeaterProvider, SerialHeaterProvider, SerialProviderConfig
@@ -34,7 +35,7 @@ class DriverTests(unittest.TestCase):
         self.assertEqual(service["/Capabilities/RoomTemperatureControl"], 0)
         self.assertIsNone(service["/Temperatures/Room"])
         self.assertEqual(service["/Timers/0/Enabled"], 0)
-        self.assertEqual(service["/Timers/2/Mode"], 1)
+        self.assertEqual(service["/Timers/2/Mode"], 0)
 
     def test_startstop_callback_updates_state(self):
         _, service, _ = self._build_app()
@@ -261,6 +262,19 @@ class DriverTests(unittest.TestCase):
         self.assertIn(service["/StateText"], {"starting ventilation", "ventilation"})
         self.assertEqual(service["/Status/FuelPumpFrequency"], 0.0)
 
+    def test_heating_mode_is_rejected_while_ventilating(self):
+        _, service, app = self._build_app()
+
+        service.set_value("/Mode", 2)
+        service.set_value("/StartStop", 1)
+        app.run_once()
+        self.assertIn(service["/StateText"], {"starting ventilation", "ventilation"})
+
+        # Manual: impossible to switch to any heating mode while ventilating.
+        service.set_value("/Mode", 0)
+
+        self.assertEqual(service["/Mode"], 2)
+
     def test_idle_ventilation_mode_survives_power_level_changes(self):
         _, service, app = self._build_app()
 
@@ -304,6 +318,111 @@ class DriverTests(unittest.TestCase):
 
         self.assertFalse(provider._matches_response(request, echoed_request))
         self.assertTrue(provider._matches_response(request, heater_response))
+
+
+class TimerCountdownTest(unittest.TestCase):
+    def _build_adapter(self, on_startstop=None):
+        service = MockVeDbusService("com.victronenergy.heater.autoterm_air2d")
+        adapter = HeaterDbusAdapter(config=DriverConfig(), service=service, on_startstop=on_startstop)
+        return service, adapter
+
+    def test_arm_timer_publishes_full_remaining_when_off(self):
+        _, service, app = DriverTests()._build_app()
+
+        service.set_value("/Timer/DurationMinutes", 30)
+        self.assertEqual(service["/Timer/DurationMinutes"], 30)
+        app.run_once()
+
+        self.assertEqual(service["/Timer/RemainingSeconds"], 1800)
+        self.assertEqual(service["/Timer/DurationMinutes"], 30)
+
+    def test_countdown_ticks_and_expiry_stops_heater(self):
+        stops = []
+        service, adapter = self._build_adapter(on_startstop=lambda enabled: stops.append(enabled) or True)
+        adapter.service.set_value("/Timer/DurationMinutes", 30)
+        running = HeaterSnapshot(phase=HeaterPhase.RUNNING)
+
+        adapter.publish_snapshot(running, True)
+        self.assertGreaterEqual(service["/Timer/RemainingSeconds"], 1798)
+        self.assertLessEqual(service["/Timer/RemainingSeconds"], 1800)
+
+        with unittest.mock.patch("gx_dbus.time.monotonic", return_value=adapter._timer_deadline + 10):
+            adapter.publish_snapshot(running, True)
+
+        self.assertEqual(service["/Timer/RemainingSeconds"], 0)
+        self.assertEqual(adapter._timer_duration_minutes, 0)
+        self.assertEqual(stops, [False])
+
+    def test_duration_clamped_and_zero_cancels(self):
+        service, adapter = self._build_adapter()
+
+        service.set_value("/Timer/DurationMinutes", 5)
+        self.assertEqual(adapter._timer_duration_minutes, 30)
+        service.set_value("/Timer/DurationMinutes", 800)
+        self.assertEqual(adapter._timer_duration_minutes, 720)
+        service.set_value("/Timer/DurationMinutes", 0)
+        self.assertEqual(adapter._timer_duration_minutes, 0)
+
+    def test_timer_start_time_path_updates_entry(self):
+        calls = []
+        service, adapter = self._build_adapter()
+        adapter._on_timer_entry_change = lambda: calls.append(1)
+
+        service.set_value("/Timers/0/StartTime", 6 * 3600 + 45 * 60)
+        self.assertEqual(adapter._timers[0].start_hour, 6)
+        self.assertEqual(adapter._timers[0].start_minute, 45)
+
+        service.set_value("/Timers/0/StartTime", 23 * 3600 + 59 * 60)
+        self.assertEqual(adapter._timers[0].start_hour, 23)
+        self.assertEqual(adapter._timers[0].start_minute, 59)
+
+        service.set_value("/Timers/0/StartTime", "junk")
+        self.assertEqual(adapter._timers[0].start_hour, 23)
+        self.assertEqual(len(calls), 2)  # rejected writes do not notify
+
+    def test_timer_mode_selects_allowed_heater_modes(self):
+        service, adapter = self._build_adapter()
+
+        self.assertEqual(adapter.timer_mode, 0)
+        self.assertEqual(service["/Timer/Mode"], 0)
+
+        service.set_value("/Timer/Mode", 3)
+        self.assertEqual(adapter.timer_mode, 3)
+        service.set_value("/Timer/Mode", 2)
+        self.assertEqual(adapter.timer_mode, 2)
+        service.set_value("/Timer/Mode", 1)
+        self.assertEqual(adapter.timer_mode, 2)  # manual-only mode rejected
+        service.set_value("/Timer/Mode", "junk")
+        self.assertEqual(adapter.timer_mode, 2)
+
+    def test_timer_presets_default_and_clamped(self):
+        service, adapter = self._build_adapter()
+
+        self.assertEqual(adapter.timer_presets, [5, 15, 30, 30, 60, 90])
+        self.assertEqual(service["/Settings/Timer/Preset/3"], 30)
+
+        service.set_value("/Settings/Timer/Preset/3", 40)
+        self.assertEqual(adapter.timer_presets[3], 40)
+
+        service.set_value("/Settings/Timer/Preset/0", 40)
+        self.assertEqual(adapter.timer_presets[0], 40)
+        service.set_value("/Settings/Timer/Preset/5", 5)
+        self.assertEqual(adapter.timer_presets[5], 30)
+        service.set_value("/Settings/Timer/Preset/5", 900)
+        self.assertEqual(adapter.timer_presets[5], 720)
+        service.set_value("/Settings/Timer/Preset/0", "junk")
+        self.assertEqual(adapter.timer_presets[0], 40)
+
+    def test_timer_presets_custom_initial_values(self):
+        service = MockVeDbusService("com.victronenergy.heater.autoterm_air2d")
+        adapter = HeaterDbusAdapter(
+            config=DriverConfig(),
+            service=service,
+            timer_presets=[40, 50, 60],
+        )
+
+        self.assertEqual(adapter.timer_presets, [40, 50, 60])
+        self.assertEqual(service["/Settings/Timer/Preset/2"], 60)
 
 
 if __name__ == "__main__":

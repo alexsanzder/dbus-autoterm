@@ -1,0 +1,244 @@
+{
+  "metadata": {
+    "device": "Autoterm AIR 2D",
+    "capture_date": "2024-09-15",
+    "description": "Real heater protocol frames and telemetry data captured from actual device",
+    "protocol_version": "1.0",
+    "serial_settings": "9600 8N1",
+    "crc_type": "CRC16 Modbus"
+  },
+  "initialization_sequence": [
+    {
+      "direction": "client_to_heater",
+      "message_type": "0x1c",
+      "description": "Initialization/identify command",
+      "hex": "aa 03 00 00 1c 95 3d"
+    },
+    {
+      "direction": "heater_to_client",
+      "message_type": "0x1c",
+      "description": "Initialization acknowledge",
+      "hex": "aa 00 00 00 1c d1 3d"
+    },
+    {
+      "direction": "client_to_heater",
+      "message_type": "0x04",
+      "description": "Get settings",
+      "hex": "aa 03 00 00 04 9f 3d"
+    },
+    {
+      "direction": "heater_to_client",
+      "message_type": "0x04",
+      "description": "Settings response",
+      "payload": "15b9004015",
+      "hex": "aa 04 05 00 04 15 b9 00 40 15 05 3d",
+      "interpretation": {
+        "use_work_time": "0x15",
+        "work_time": "0xb9",
+        "temperature_source": "0x00",
+        "target_temperature": "0x40",
+        "wait_mode": "0x15"
+      }
+    },
+    {
+      "direction": "client_to_heater",
+      "message_type": "0x06",
+      "description": "Get version",
+      "hex": "aa 03 00 00 06 5e bc"
+    },
+    {
+      "direction": "heater_to_client",
+      "message_type": "0x06",
+      "description": "Version response",
+      "payload": "0201030503",
+      "hex": "aa 04 05 00 06 02 01 03 05 03 c1 6e",
+      "interpretation": {
+        "version_major": 2,
+        "version_minor": 1,
+        "version_patch": 3,
+        "version_build": 5,
+        "blackbox_version": 3
+      }
+    }
+  ],
+  "status_frames": [
+    {
+      "message_type": "0x0f",
+      "description": "Get status - Real captured data",
+      "captured_payloads": [
+        {
+          "timestamp": "2024-09-15T13:50:00Z",
+          "hex": "aa 04 13 00 0f 03 23 00 1b 7f 00 84 01 2c 08 00 46 46 00 00 00 00 00 62",
+          "payload": "0323001b7f0084012c08004646000000000062",
+          "interpretation": {
+            "status_code_major": 3,
+            "status_code_minor": 0x23,
+            "status_code_text": "Only fan (ventilation mode)",
+            "unknown_1": 0x00,
+            "internal_temperature_c": 0x1b,
+            "internal_temperature_decoded": 27,
+            "external_temperature_c": 0x7f,
+            "external_temperature_decoded": "not connected (127°C invalid)",
+            "unknown_2": 0x00,
+            "voltage_raw": 0x84,
+            "voltage_v": 13.2,
+            "unknown_3": 0x01,
+            "heater_temperature_c": 0x2c,
+            "heater_temperature_decoded": 44,
+            "unknown_4": 0x08,
+            "unknown_5": 0x00,
+            "fan_rpm_set_raw": 0x46,
+            "fan_rpm_set": 70,
+            "fan_rpm_actual_raw": 0x46,
+            "fan_rpm_actual": 70,
+            "unknown_6": "00 00 00 00 00 00 00"
+          }
+        },
+        {
+          "timestamp": "2024-09-15T13:50:02Z",
+          "hex": "aa 04 13 00 0f 03 23 00 1b 7f 00 84 01 2c 08 00 46 47 00 00 00 00 00 62",
+          "payload": "0323001b7f0084012c08004647000000000062",
+          "variation": "Fan RPM changes slightly (47 vs 46)"
+        },
+        {
+          "timestamp": "2024-09-15T13:50:04Z",
+          "hex": "aa 04 13 00 0f 03 23 00 1c 7f 00 84 01 2d 08 00 46 45 00 00 00 00 00 62",
+          "payload": "0323001c7f0084012d08004645000000000062",
+          "variation": "Internal temp increases 0x1b→0x1c, heater temp 0x2c→0x2d"
+        }
+      ]
+    }
+  ],
+  "command_frames": [
+    {
+      "message_type": "0x01",
+      "description": "Turn heater on",
+      "command_hex": "aa 03 06 00 01 01 00 04 10 00 08 b3 ee",
+      "response_hex": "aa 04 06 00 01 01 00 04 10 00 08 69 5f",
+      "payload_layout": {
+        "use_work_time": 0x01,
+        "work_time": 0x00,
+        "temperature_source": 0x04,
+        "target_temperature": 0x10,
+        "wait_mode": 0x00,
+        "power_level": 0x08
+      }
+    },
+    {
+      "message_type": "0x02",
+      "description": "Get/Set settings",
+      "get_request_hex": "aa 03 00 00 02 9d bd",
+      "set_request_hex": "aa 03 06 00 02 [payload] [crc]",
+      "response_hex": "aa 04 06 00 02 01 00 04 10 00 08 69 6c"
+    },
+    {
+      "message_type": "0x03",
+      "description": "Turn heater/fan off",
+      "command_hex": "aa 03 00 00 03 5d 7c",
+      "response_hex": "aa 04 00 00 03 29 7d"
+    },
+    {
+      "message_type": "0x11",
+      "description": "Set temperature",
+      "command_hex": "aa 03 01 00 11 14 b2 51",
+      "response_hex": "aa 04 01 00 11 14 72 e4",
+      "payload": "0x14",
+      "target_temperature_c": 20
+    },
+    {
+      "message_type": "0x23",
+      "description": "Turn only fan on (ventilation)",
+      "command_hex": "aa 03 04 00 23 ff ff 08 ff e1 0b",
+      "response_hex": "aa 04 04 00 23 ff ff 08 43 b6 4b",
+      "payload_layout": {
+        "unknown_0": 0xff,
+        "unknown_1": 0xff,
+        "power_level": 0x08,
+        "unknown_2": 0xff
+      }
+    }
+  ],
+  "telemetry_readings": [
+    {
+      "timestamp": "2024-09-15T13:50:00Z",
+      "status_code": "0x03 0x23",
+      "state": "Only fan (ventilation mode)",
+      "internal_temperature_c": 27,
+      "external_temperature_c": null,
+      "heater_temperature_c": 44,
+      "battery_voltage_v": 13.2,
+      "fan_rpm_set": 70,
+      "fan_rpm_actual": 70,
+      "heater_state": "Ventilation active"
+    },
+    {
+      "timestamp": "2024-09-15T13:50:02Z",
+      "status_code": "0x03 0x23",
+      "state": "Only fan (ventilation mode)",
+      "internal_temperature_c": 27,
+      "external_temperature_c": null,
+      "heater_temperature_c": 44,
+      "battery_voltage_v": 13.2,
+      "fan_rpm_set": 70,
+      "fan_rpm_actual": 71,
+      "heater_state": "Ventilation active"
+    },
+    {
+      "timestamp": "2024-09-15T13:50:04Z",
+      "status_code": "0x03 0x23",
+      "state": "Only fan (ventilation mode)",
+      "internal_temperature_c": 28,
+      "external_temperature_c": null,
+      "heater_temperature_c": 45,
+      "battery_voltage_v": 13.2,
+      "fan_rpm_set": 70,
+      "fan_rpm_actual": 69,
+      "heater_state": "Ventilation active"
+    }
+  ],
+  "real_heater_characteristics": {
+    "firmware_version": "2.1.3.5",
+    "blackbox_version": 3,
+    "response_time_ms": 100,
+    "polling_interval_s": 1,
+    "temperature_update_rate": "every 1-2 seconds",
+    "fan_rpm_variance": "±1-2 RPM (normal oscillation)",
+    "voltage_stability": "±0.1V under load",
+    "startup_sequence": [
+      "Send 0x1C (init)",
+      "Receive 0x1C response",
+      "Send 0x04 (get settings)",
+      "Receive 0x04 response",
+      "Send 0x06 (get version)",
+      "Receive 0x06 response",
+      "Begin polling 0x0F (status) every 1 second"
+    ]
+  },
+  "frame_structure": {
+    "preamble": "0xAA",
+    "device_byte": {
+      "0x02": "diagnostic",
+      "0x03": "request",
+      "0x04": "response",
+      "0x00": "acknowledgement"
+    },
+    "payload_length": "bytes 3-255",
+    "message_id_1": "always 0x00",
+    "message_id_2": "command/response type",
+    "crc": "CRC16 Modbus, 2 bytes, high byte first"
+  },
+  "dummy_driver_usage": {
+    "how_to_use": "Import these frames and telemetry readings into the dummy driver",
+    "implementation_steps": [
+      "1. Parse the 'initialization_sequence' frames for startup",
+      "2. Use 'command_frames' for protocol command responses",
+      "3. Cycle through 'status_frames' for 0x0F status polling",
+      "4. Add 'telemetry_readings' to simulate realistic sensor data",
+      "5. Vary values slightly (±1-2) to simulate real device behavior"
+    ],
+    "files_to_update": [
+      "emulation/src/heater.py - Add these frames to DummyHeaterProvider",
+      "emulation/tests/test_heater.py - Use telemetry_readings for assertions"
+    ]
+  }
+}

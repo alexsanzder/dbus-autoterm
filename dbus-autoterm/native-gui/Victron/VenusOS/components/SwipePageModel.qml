@@ -78,6 +78,22 @@ ObjectModel {
 		view: root.view
 	}
 
+	function createHeaterPage() {
+		const component = Qt.createComponent(Qt.resolvedUrl("../pages/HeaterPage.qml"))
+		if (component.status === Component.Error) {
+			console.warn("HeaterPage load failed:", component.errorString())
+			return null
+		}
+		const page = component.createObject(parent, {
+			"view": root.view,
+			"heaterModel": root.heaterModel
+		})
+		if (!page) {
+			console.warn("HeaterPage instantiation failed")
+		}
+		return page
+	}
+
 	Component.onCompleted: {
 		if (showLevelsPage) {
 			levelsPage = levelsComponent.createObject(parent)
@@ -89,12 +105,10 @@ ObjectModel {
 		}
 
 		if (showHeaterPage) {
-			const component = Qt.createComponent(Qt.resolvedUrl("../pages/HeaterPage.qml"))
-			heaterPage = component.createObject(parent, {
-				"view": root.view,
-				"heaterModel": root.heaterModel
-			})
-			insert(count - 2, heaterPage)
+			heaterPage = createHeaterPage()
+			if (heaterPage) {
+				insert(count - 2, heaterPage)
+			}
 		}
 
 		completed = true
@@ -127,12 +141,10 @@ ObjectModel {
 		if (showHeaterPage) {
 			for (let i = 0; i < root.view.count; ++i) {
 				if (root.view.itemAt(i) === notificationsPage) {
-					const component = Qt.createComponent(Qt.resolvedUrl("../pages/HeaterPage.qml"))
-					root.heaterPage = component.createObject(parent, {
-						"view": root.view,
-						"heaterModel": root.heaterModel
-					})
-					root.view.insertItem(i, root.heaterPage)
+					root.heaterPage = createHeaterPage()
+					if (root.heaterPage) {
+						root.view.insertItem(i, root.heaterPage)
+					}
 					break
 				}
 			}

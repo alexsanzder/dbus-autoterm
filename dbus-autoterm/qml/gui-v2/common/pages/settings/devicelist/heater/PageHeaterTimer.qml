@@ -76,8 +76,8 @@ Page {
 			ListSpinBox {
 				text: "Temperature"
 				dataItem.uid: root.timerBindPrefix + "/TargetTemperature"
-				from: 5
-				to: 35
+				from: 0
+				to: 30
 				stepSize: 1
 				suffix: Units.defaultUnitString(Global.systemSettings.temperatureUnit)
 			}

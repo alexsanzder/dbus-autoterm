@@ -8,13 +8,15 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from domain import HeaterPhase, OperatingMode
-from gx_dbus import DriverConfig, HeaterDbusAdapter, HeaterUiMode, MockVeDbusService
+from gx_dbus import DriverConfig, HeaterDbusAdapter, HeaterTimerEntry, HeaterUiMode, MockVeDbusService
 from provider import DummyHeaterProvider, SerialHeaterProvider, SerialProviderConfig
 from room_sensor import (
     AUTO_ROOM_TEMPERATURE_SERVICE,
     HEATER_INTAKE_TEMPERATURE_SERVICE,
+    HEATER_INTERNAL_TEMPERATURE_SERVICE,
     DbusRoomTemperatureReader,
     NullRoomTemperatureReader,
+    RoomTemperatureReading,
     RoomTemperatureServiceInfo,
 )
 
@@ -25,10 +27,14 @@ LOG = logging.getLogger(__name__)
 class RuntimeConfig:
     backend: str = "dummy"
     serial_device: str | None = None
+    provider_data: str = "simulated"  # "simulated" or "real" (for captured data)
     room_temperature_service: str = "auto"
     poll_interval: float = 1.0
     log_level: str = "INFO"
     mock_dbus: bool = False
+    timer_presets: tuple[int, ...] = (5, 15, 30, 30, 60, 90)
+    timer_mode: int = 0
+    schedule_timers: list[HeaterTimerEntry] = field(default_factory=list)
     driver_config: DriverConfig = field(default_factory=DriverConfig)
 
 
@@ -46,14 +52,18 @@ class HeaterDriverApp:
         self.config_path = config_path
 
     def startstop(self, enabled: bool) -> bool:
-        if enabled:
-            if self.dbus_adapter.current_heater_mode == HeaterUiMode.VENTILATION:
-                snapshot = self.provider.start_ventilation(self.provider.get_snapshot().settings.power_level)
+        try:
+            if enabled:
+                if self.dbus_adapter.current_heater_mode == HeaterUiMode.VENTILATION:
+                    snapshot = self.provider.start_ventilation(self.provider.get_snapshot().settings.power_level)
+                else:
+                    snapshot = self.provider.start(self.provider.get_snapshot().settings)
             else:
-                snapshot = self.provider.start(self.provider.get_snapshot().settings)
-        else:
-            snapshot = self.provider.stop()
-        self._publish_snapshot_with_room_context(snapshot)
+                snapshot = self.provider.stop()
+            self._publish_snapshot_with_room_context(snapshot)
+        except Exception:
+            LOG.exception("startstop command failed; heater likely disconnected")
+            self._publish_snapshot_with_room_context(self.provider.get_snapshot())
         return True
 
     def run_once(self) -> None:
@@ -63,6 +73,15 @@ class HeaterDriverApp:
     def _publish_snapshot_with_room_context(self, snapshot) -> None:
         room_temperature = self.room_temperature_reader.refresh()
         selected_service = self.room_temperature_reader.selected_service or AUTO_ROOM_TEMPERATURE_SERVICE
+        
+        # Use heater's internal temperature if selected
+        if selected_service == HEATER_INTERNAL_TEMPERATURE_SERVICE:
+            room_temperature = RoomTemperatureReading(
+                temperature_c=float(snapshot.telemetry.internal_temperature_c),
+                source_text="Heater internal sensor",
+                service_name=HEATER_INTERNAL_TEMPERATURE_SERVICE,
+            )
+        
         self.dbus_adapter.publish_snapshot(
             snapshot,
             self.provider.get_health().connected,
@@ -70,6 +89,15 @@ class HeaterDriverApp:
             selected_service,
         )
         available_services = self.room_temperature_reader.available_services()
+        # Add heater's internal temperature sensor as an available option
+        available_services = [
+            RoomTemperatureServiceInfo(
+                service_name=HEATER_INTERNAL_TEMPERATURE_SERVICE,
+                display_name="Heater internal sensor",
+                temperature_c=float(snapshot.telemetry.internal_temperature_c),
+            ),
+            *available_services,
+        ]
         if snapshot.telemetry.external_temperature_c is not None:
             available_services = [
                 RoomTemperatureServiceInfo(
@@ -89,7 +117,12 @@ class HeaterDriverApp:
         return True
 
     def update_mode(self, mode: int) -> bool:
-        return self._update_settings(mode=OperatingMode(int(mode)))
+        overrides = self.dbus_adapter.mode_settings_overrides()
+        if self.dbus_adapter.current_heater_mode == HeaterUiMode.VENTILATION:
+            # Ventilation runs via its own start frame (0x23); only the cached
+            # power level needs to be reapplied for the new mode.
+            return self._update_settings(**overrides)
+        return self._update_settings(mode=OperatingMode(int(mode)), **overrides)
 
     def update_target_temperature(self, setpoint_c: int) -> bool:
         return self._update_settings(setpoint_c=int(setpoint_c))
@@ -105,15 +138,79 @@ class HeaterDriverApp:
         return True
 
     def _update_settings(self, **changes) -> bool:
-        current_snapshot = self.provider.get_snapshot()
-        settings = replace(current_snapshot.settings, **changes)
-        active = current_snapshot.phase in {HeaterPhase.STARTING, HeaterPhase.WARMING_UP, HeaterPhase.RUNNING}
-        if self.dbus_adapter.current_heater_mode == HeaterUiMode.VENTILATION:
-            snapshot = self.provider.start_ventilation(settings.power_level) if active else self.provider.update_settings(settings)
-        else:
-            snapshot = self.provider.update_settings(settings)
-        self._publish_snapshot_with_room_context(snapshot)
+        try:
+            current_snapshot = self.provider.get_snapshot()
+            settings = replace(current_snapshot.settings, **changes)
+            active = current_snapshot.phase in {HeaterPhase.STARTING, HeaterPhase.WARMING_UP, HeaterPhase.RUNNING}
+            if self.dbus_adapter.current_heater_mode == HeaterUiMode.VENTILATION:
+                snapshot = self.provider.start_ventilation(settings.power_level) if active else self.provider.update_settings(settings)
+            else:
+                snapshot = self.provider.update_settings(settings)
+            self._publish_snapshot_with_room_context(snapshot)
+        except Exception:
+            LOG.exception("settings update failed; heater likely disconnected")
+            self._publish_snapshot_with_room_context(self.provider.get_snapshot())
         return True
+
+    def update_timer_preset(self, index: int, minutes: int) -> bool:
+        self._persist_timer_presets()
+        return True
+
+    def update_timer_mode(self, mode: int) -> bool:
+        self._persist_timer_mode()
+        return True
+
+    def _persist_timer_mode(self) -> None:
+        if self.config_path is None:
+            return
+        config = ConfigParser()
+        if self.config_path.exists():
+            with self.config_path.open("r", encoding="utf-8") as handle:
+                config.read_file(handle)
+        if not config.has_section("timer"):
+            config.add_section("timer")
+        config.set("timer", "mode", str(self.dbus_adapter.timer_mode))
+        with self.config_path.open("w", encoding="utf-8") as handle:
+            config.write(handle)
+
+    def persist_schedule_timers(self) -> None:
+        self._persist_schedule_timers()
+
+    def _persist_schedule_timers(self) -> None:
+        if self.config_path is None:
+            return
+        config = ConfigParser()
+        if self.config_path.exists():
+            with self.config_path.open("r", encoding="utf-8") as handle:
+                config.read_file(handle)
+        if not config.has_section("timers"):
+            config.add_section("timers")
+        for index, timer in enumerate(self.dbus_adapter.timer_entries):
+            config.set("timers", f"t{index}_enabled", str(timer.enabled))
+            config.set("timers", f"t{index}_cycle", str(timer.cycle))
+            config.set("timers", f"t{index}_days", str(timer.days))
+            config.set("timers", f"t{index}_start_hour", str(timer.start_hour))
+            config.set("timers", f"t{index}_start_minute", str(timer.start_minute))
+            config.set("timers", f"t{index}_duration_minutes", str(timer.duration_minutes))
+            config.set("timers", f"t{index}_mode", str(timer.mode))
+            config.set("timers", f"t{index}_target_temperature", str(timer.target_temperature))
+            config.set("timers", f"t{index}_power_level", str(timer.power_level))
+        with self.config_path.open("w", encoding="utf-8") as handle:
+            config.write(handle)
+
+    def _persist_timer_presets(self) -> None:
+        if self.config_path is None:
+            return
+        config = ConfigParser()
+        if self.config_path.exists():
+            with self.config_path.open("r", encoding="utf-8") as handle:
+                config.read_file(handle)
+        if not config.has_section("timer"):
+            config.add_section("timer")
+        for index, minutes in enumerate(self.dbus_adapter.timer_presets):
+            config.set("timer", f"preset{index}", str(minutes))
+        with self.config_path.open("w", encoding="utf-8") as handle:
+            config.write(handle)
 
     def _persist_room_temperature_service(self, service_name: str) -> None:
         if self.config_path is None:
@@ -169,6 +266,7 @@ def _build_runtime_config(args: argparse.Namespace, arg_list: list[str], config:
         if args.serial_device is not None
         else _config_get(config, "driver", "serial_device", None)
     )
+    provider_data = _config_get(config, "driver", "provider_data", "simulated")
     room_temperature_service = (
         args.room_temperature_service
         if "--room-temperature-service" in arg_list and args.room_temperature_service is not None
@@ -183,6 +281,28 @@ def _build_runtime_config(args: argparse.Namespace, arg_list: list[str], config:
         args.log_level if "--log-level" in arg_list else _config_get(config, "driver", "log_level", args.log_level)
     )
     mock_dbus = args.mock_dbus or _config_getboolean(config, "driver", "mock_dbus", False)
+    timer_mode = _config_getint(config, "timer", "mode", 0)
+    timer_presets = (
+        _config_getint(config, "timer", "preset0", 5),
+        _config_getint(config, "timer", "preset1", 15),
+        _config_getint(config, "timer", "preset2", 30),
+        _config_getint(config, "timer", "preset3", 30),
+        _config_getint(config, "timer", "preset4", 60),
+        _config_getint(config, "timer", "preset5", 90),
+    )
+    schedule_timers = []
+    for index in range(3):
+        schedule_timers.append(HeaterTimerEntry(
+            enabled=_config_getint(config, "timers", f"t{index}_enabled", 0),
+            cycle=_config_getint(config, "timers", f"t{index}_cycle", 0),
+            days=_config_getint(config, "timers", f"t{index}_days", 0x7F),
+            start_hour=_config_getint(config, "timers", f"t{index}_start_hour", 6),
+            start_minute=_config_getint(config, "timers", f"t{index}_start_minute", 0),
+            duration_minutes=_config_getint(config, "timers", f"t{index}_duration_minutes", 30),
+            mode=_config_getint(config, "timers", f"t{index}_mode", int(HeaterUiMode.POWER)),
+            target_temperature=_config_getint(config, "timers", f"t{index}_target_temperature", 20),
+            power_level=_config_getint(config, "timers", f"t{index}_power_level", 2),
+        ))
     driver_config = DriverConfig(
         service_name=args.service_name or _config_get(config, "dbus", "service_name", DriverConfig.service_name),
         device_instance=(
@@ -202,10 +322,14 @@ def _build_runtime_config(args: argparse.Namespace, arg_list: list[str], config:
     return RuntimeConfig(
         backend=backend,
         serial_device=serial_device,
+        provider_data=provider_data,
         room_temperature_service=room_temperature_service,
         poll_interval=poll_interval,
         log_level=log_level,
         mock_dbus=mock_dbus,
+        timer_presets=timer_presets,
+        timer_mode=timer_mode,
+        schedule_timers=schedule_timers,
         driver_config=driver_config,
     )
 
@@ -269,7 +393,12 @@ def main(argv: list[str] | None = None) -> int:
     _configure_venus_dbus_runtime(runtime.mock_dbus)
 
     if runtime.backend == "dummy":
-        provider = DummyHeaterProvider()
+        if runtime.provider_data == "real":
+            LOG.info("Loading real heater data from captured frames...")
+            provider = DummyHeaterProvider(use_real_data=True)
+        else:
+            LOG.info("Using simulated dummy heater data")
+            provider = DummyHeaterProvider(use_real_data=False)
     else:
         if not runtime.serial_device:
             raise SystemExit("--serial-device is required for --backend=serial")
@@ -283,6 +412,9 @@ def main(argv: list[str] | None = None) -> int:
     dbus_adapter = HeaterDbusAdapter(
         config=runtime.driver_config,
         service=service,
+        timer_presets=list(runtime.timer_presets),
+        timer_mode=runtime.timer_mode,
+        timer_entries=list(runtime.schedule_timers),
     )
     if runtime.mock_dbus:
         room_temperature_reader = NullRoomTemperatureReader()
@@ -301,6 +433,9 @@ def main(argv: list[str] | None = None) -> int:
     dbus_adapter._on_target_temperature_change = app.update_target_temperature
     dbus_adapter._on_power_level_change = app.update_power_level
     dbus_adapter._on_room_temperature_service_change = app.update_room_temperature_service
+    dbus_adapter._on_timer_preset_change = app.update_timer_preset
+    dbus_adapter._on_timer_entry_change = app.persist_schedule_timers
+    dbus_adapter._on_timer_mode_change = app.update_timer_mode
 
     try:
         try:
